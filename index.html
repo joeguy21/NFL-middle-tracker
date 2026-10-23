@@ -340,8 +340,13 @@ async function refreshOdds(){
    });
    const normalized=rawPrices.map(p=>{
     const out=normalizeOutcome(p);
-    if(!out.name){
-     const candidate=participantById.get(out.selection)||participantById.get(out.participantId);
+    // Some FanLine boards put the selection ID in the name/selection field.
+    // Replace numeric display labels with the matching participant name.
+    const keys=[out.selection,out.participantId,p?.id,p?.selection_id,p?.outcome_id,p?.participant_id,p?.team_id]
+     .filter(v=>v!==undefined&&v!==null).map(String);
+    const looksLikeId=/^\\d+$/.test(String(out.name||"").trim());
+    if(!out.name||looksLikeId){
+     const candidate=keys.map(k=>participantById.get(k)).find(Boolean);
      if(candidate)out.name=String(candidate);
     }
     return out;
