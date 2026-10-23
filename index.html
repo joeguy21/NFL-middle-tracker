@@ -148,15 +148,27 @@ function fillOpponent(){
  $("opponent").value=s==="away"?g.home:g.away;
  prefillOriginalMoneyline();
 }
+function oddsMapKey(teamName){
+ const idx=$("matchup").value, g=idx!==""?scheduleEvents[Number(idx)]:null;
+ return g ? [teamKey(g.away),teamKey(g.home),teamKey(teamName)].join("|") : "";
+}
+function savedSelectionMap(){try{return JSON.parse(localStorage.getItem("nflOddsSelectionMap")||"{}")}catch{return {}}}
 function findSelectionPrice(teamName){
  const aliases=teamAliases(teamName);
  const markets=latestOdds.filter(ev=>/money ?line|match winner|winner/i.test(String(ev.market||"")));
- for(const ev of markets){
-  for(const p of (ev.prices||[])){
-   const label=teamKey(p.name||p.selection||p.team||p.outcome||p.label||"");
-   if(label && aliases.some(a=>label===a||label.includes(a)||a.includes(label)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
+ // Prefer an explicitly saved team-to-selection assignment when provider rows use numeric IDs.
+ const key=oddsMapKey(teamName), saved=savedSelectionMap()[key];
+ if(saved){
+  for(const ev of markets)for(const p of (ev.prices||[])){
+   const ids=[p.selection,p.participantId].filter(Boolean).map(String);
+   if(ids.includes(String(saved)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
     return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
   }
+ }
+ for(const ev of markets)for(const p of (ev.prices||[])){
+  const label=teamKey(p.name||p.selection||p.team||p.outcome||p.label||"");
+  if(label && !/^\\d+$/.test(label) && aliases.some(a=>label===a||label.includes(a)||a.includes(label)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
+   return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
  }
  return null;
 }
@@ -193,8 +205,12 @@ function prefillOriginalMoneyline(){
     btn.textContent=label+" · "+(Number(p.american)>0?"+":"")+p.american;
     btn.addEventListener("click",()=>{
      $("odds").value=Number(p.american);
+     // Remember which feed selection the user verified as this team for this matchup.
+     const map=savedSelectionMap(), key=oddsMapKey($("team").value);
+     if(key)map[key]=String(p.selection||p.participantId||"");
+     localStorage.setItem("nflOddsSelectionMap",JSON.stringify(map));
      const help=$("oddsHelp");help.className="status good";
-     help.textContent="Copied live price "+(Number(p.american)>0?"+":"")+p.american+" from "+(ev.fixture||"selected matchup")+". Confirm this outcome is "+$("team").value+" and verify the accepted ticket price.";
+     help.textContent="Saved this selection for "+$("team").value+". Future refreshes will fill its live price automatically. Verify against your accepted ticket.";
      choices.querySelectorAll("button").forEach(b=>b.style.outline="");
      btn.style.outline="2px solid #39d98a";
     });
