@@ -1,0 +1,427 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<meta charset="UTF-8">
+
+<title>NFL Middle Tracker</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+body{margin:0;background:#101827;color:#f5f7fb;font:16px Arial,sans-serif}
+
+header{background:#182438;padding:22px 16px;border-bottom:2px solid #39d98a}
+
+h1{margin:0;font-size:25px}
+
+small,.muted{color:#aab6ca}
+
+main{max-width:650px;margin:auto;padding:16px}
+
+.card{background:#1b293e;border:1px solid #34445e;
+
+border-radius:14px;padding:16px;margin-bottom:16px}
+
+h2{font-size:19px;margin-top:0}
+
+label{display:block;font-size:13px;color:#c1ccdc;margin:12px 0 5px}
+
+input,select{width:100%;padding:12px;border-radius:8px;
+
+border:1px solid #53627a;background:#101827;color:white;font-size:16px}
+
+button{border:0;border-radius:9px;padding:13px;font-weight:bold;
+
+font-size:15px;cursor:pointer}
+
+.primary{background:#39d98a;color:#10251c;width:100%;margin-top:15px}
+
+.lock{background:#f2c94c;color:#191919;width:100%;margin-top:10px}
+
+.delete{background:#482a35;color:#ffb8c5;margin-top:10px}
+
+.stat{font-size:26px;font-weight:bold;color:#39d98a;margin-top:5px}
+
+.result{padding:12px;background:#101827;border-radius:8px;margin-top:10px}
+
+.row{display:flex;justify-content:space-between;gap:12px}
+
+hr{border:0;border-top:1px solid #34445e;margin:15px 0}
+
+.good{color:#39d98a}.bad{color:#ff8888}
+
+.locked{color:#f2c94c;font-weight:bold}
+
+footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<h1>🏈 NFL Middle Tracker</h1>
+
+<small>Hedge • Middle • Manage Risk</small>
+
+</header>
+
+<main>
+
+<div class="card">
+
+<h2>Dashboard</h2>
+
+<div class="row"><span>Tracked games</span><b id="count">0</b></div>
+
+<div class="row" style="margin-top:12px">
+
+<span>Recorded stakes</span><b id="exposure">$0.00</b>
+
+</div>
+
+<p class="muted">Demo calculator • Manual odds</p>
+
+</div>
+
+<div class="card">
+
+<h2>Enter Original Bet</h2>
+
+<label>Game name</label>
+
+<input id="game" placeholder="Example: Steelers vs Bengals">
+
+<label>Team / side you bet</label>
+
+<input id="team" placeholder="Example: Steelers">
+
+<label>Original sportsbook</label>
+
+<select id="book">
+
+<option>FanDuel</option><option>DraftKings</option>
+
+<option>Hard Rock Bet</option>
+
+</select>
+
+<label>Original bet type</label>
+
+<select id="type">
+
+<option value="ML">Moneyline</option>
+
+</select>
+
+<label>Original American odds</label>
+
+<input id="odds" type="number" placeholder="-110">
+
+<label>Actual stake ($)</label>
+
+<input id="stake" type="number" min="0.01" step=".01" placeholder="Your actual wager">
+
+<label>Opposing team</label>
+
+<input id="opponent" placeholder="Example: Bengals">
+
+<label>Hedge sportsbook</label>
+
+<select id="hedgeBook">
+
+<option>FanDuel</option><option>DraftKings</option>
+
+<option>Hard Rock Bet</option>
+
+</select>
+
+<label>Opposing odds (American)</label>
+
+<input id="hedgeOdds" type="number" placeholder="-105">
+
+<button class="primary" onclick="calculate()">CALCULATE HEDGE</button>
+
+<div id="calc"></div>
+
+</div>
+
+<div class="card">
+
+<h2>My Tracked Games</h2>
+
+<div id="games"><p class="muted">No bets recorded yet.</p></div>
+
+</div>
+
+<footer>
+
+Calculations are estimates from manually entered odds.
+
+No live feeds or wagers are connected. Verify all terms and prices.
+
+</footer>
+
+</main>
+
+<script>
+
+let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
+
+let pending=null;
+
+function dec(a){
+
+ a=Number(a);
+
+ if(!a||!Number.isFinite(a))return null;
+
+ return a>0?1+a/100:1+100/Math.abs(a);
+
+}
+
+function money(n){
+
+ return n.toLocaleString("en-US",{style:"currency",currency:"USD"});
+
+}
+
+function save(){
+
+ localStorage.setItem("nfltracker",JSON.stringify(bets));
+
+ render();
+
+}
+
+function calculate(){
+
+ let game=document.getElementById("game").value.trim();
+
+ let team=document.getElementById("team").value.trim();
+
+ let opp=document.getElementById("opponent").value.trim();
+
+ let book=document.getElementById("book").value;
+
+ let hb=document.getElementById("hedgeBook").value;
+
+ let a=Number(document.getElementById("odds").value);
+
+ let b=Number(document.getElementById("hedgeOdds").value);
+
+ let s=Number(document.getElementById("stake").value);
+
+ let d=dec(a),e=dec(b);
+
+ let out=document.getElementById("calc");
+
+ pending=null;
+
+ if(!game||!team||!opp||!d||!e||s<=0||!Number.isFinite(s)){
+
+ out.innerHTML='<p class="bad">Enter game, teams, valid odds and stake.</p>';return;
+
+ }
+
+ if(team.toLowerCase()===opp.toLowerCase()){
+
+ out.innerHTML='<p class="bad">Enter two different sides.</p>';return;
+
+ }
+
+ // Equalize total returns on either side.
+
+ let h=Math.round(s*d/e*100)/100;
+
+ let win1=Math.round((s*(d-1)-h)*100)/100;
+
+ let win2=Math.round((-s+h*(e-1))*100)/100;
+
+ let guaranteed=Math.min(win1,win2);
+
+ let total=s+h;
+
+ let roi=guaranteed/total*100;
+
+ pending={game,team,opp,book,hb,a,b,s,h,win1,win2,
+
+ guaranteed,roi,locked:false,id:Date.now()};
+
+ out.innerHTML=`
+
+ <div class="result">
+
+ <div class="row"><span>Original bet</span><b>${money(s)}</b></div>
+
+ <div class="row"><span>Recommended hedge</span><b>${money(h)}</b></div>
+
+ <div class="row"><span>Hedge book</span><b>${hb}</b></div>
+
+ <hr>
+
+ <div class="row"><span>Total stakes</span><b>${money(total)}</b></div>
+
+ <div class="row"><span>${team} wins</span><b class="${win1>=0?'good':'bad'}">${money(win1)}</b></div>
+
+ <div class="row"><span>${opp} wins</span><b class="${win2>=0?'good':'bad'}">${money(win2)}</b></div>
+
+ <hr>
+
+ <div>Worst-case net</div>
+
+ <div class="stat">${money(guaranteed)}</div>
+
+ <p>Estimated ROI: ${roi.toFixed(2)}%</p>
+
+ </div>
+
+ <p class="muted">Equal-return hedge, rounded to cents.
+
+Verify market rules, accepted price and limits.</p>
+
+ <button class="primary" onclick="record()">SAVE RECOMMENDATION</button>
+
+ `;
+
+}
+
+function record(){
+
+ if(!pending)return;
+
+ if(bets.some(x=>x.game.toLowerCase()===pending.game.toLowerCase()
+
+ &&!x.locked)){
+
+ alert("This game already has an open record.");
+
+ return;
+
+ }
+
+ bets.push(pending);
+
+ pending=null;
+
+ document.getElementById("calc").innerHTML=
+
+ "<p class='good'>Recommendation saved.</p>";
+
+ save();
+
+}
+
+function lockGame(id){
+
+ let g=bets.find(x=>x.id===id);
+
+ if(!g)return;
+
+ if(!confirm("Lock this game and stop future recommendations?"))return;
+
+ g.locked=true;
+
+ g.lockedAt=new Date().toISOString();
+
+ save();
+
+}
+
+function reopen(id){
+
+ let g=bets.find(x=>x.id===id);
+
+ if(!g)return;
+
+ if(!confirm("Reopen this game for calculations?"))return;
+
+ g.locked=false;
+
+ save();
+
+}
+
+function removeGame(id){
+
+ if(!confirm("Delete this demo record?"))return;
+
+ bets=bets.filter(x=>x.id!==id);
+
+ save();
+
+}
+
+function render(){
+
+ document.getElementById("count").textContent=bets.length;
+
+ document.getElementById("exposure").textContent=
+
+ money(bets.reduce((n,x)=>n+x.s+x.h,0));
+
+ let el=document.getElementById("games");
+
+ if(!bets.length){
+
+ el.innerHTML='<p class="muted">No bets recorded yet.</p>';return;
+
+ }
+
+ el.innerHTML=bets.map(g=>`
+
+ <div class="result">
+
+ <div class="row"><b>${esc(g.game)}</b>
+
+ <span class="${g.locked?'locked':'good'}">${g.locked?'LOCKED':'OPEN'}</span></div>
+
+ <p>${esc(g.team)} vs ${esc(g.opp)}</p>
+
+ <p class="muted">Original: ${money(g.s)} @ ${g.a>0?'+':''}${g.a}
+
+ (${esc(g.book)})</p>
+
+ <p class="muted">Suggested hedge: ${money(g.h)} @ ${g.b>0?'+':''}${g.b}
+
+ (${esc(g.hb)})</p>
+
+ <p>Worst-case estimate: <b>${money(g.guaranteed)}</b></p>
+
+ ${g.locked?`<button class="primary" onclick="reopen(${g.id})">REOPEN GAME</button>`
+
+ :`<button class="lock" onclick="lockGame(${g.id})">I BET THIS — LOCK GAME</button>`}
+
+ <button class="delete" onclick="removeGame(${g.id})">Delete demo record</button>
+
+ </div>`).join("");
+
+}
+
+function esc(s){
+
+ return String(s).replace(/[&<>"']/g,c=>({
+
+ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+
+ }[c]));
+
+}
+
+render();
+
+</script>
+
+</body>
+
+</html>
