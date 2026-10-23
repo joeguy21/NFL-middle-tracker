@@ -204,17 +204,27 @@ async function refreshOdds(){
   const res=await fetch("/api/odds",{cache:"no-store"});
   const data=await res.json();
   if(!res.ok)throw new Error(data.error||("Odds service error "+res.status));
-  // FanLine board may be returned as fixtures/events; normalize only known fields.
-  latestOdds=(data.fixtures||data.events||data.board||[]).map(ev=>({
-   sport:ev.sport||ev.league||"",
-   fixture:ev.fixture||ev.name||ev.event||"",
-   market:ev.market||"",
+  // Accept common FanLine payload wrappers and normalize each market row.
+  const rows=Array.isArray(data)?data:
+    Array.isArray(data.fixtures)?data.fixtures:
+    Array.isArray(data.events)?data.events:
+    Array.isArray(data.board)?data.board:
+    Array.isArray(data.data?.fixtures)?data.data.fixtures:
+    Array.isArray(data.data?.events)?data.data.events:
+    Array.isArray(data.data)?data.data:
+    Array.isArray(data.results)?data.results:[];
+  latestOdds=rows.map(ev=>({
+   sport:ev.sport||ev.league||ev.sport_name||"",
+   fixture:ev.fixture||ev.name||ev.event||ev.matchup||"",
+   market:ev.market||ev.market_name||"",
    status:ev.status||"",
-   inplay:Boolean(ev.inplay),
-   updated_at:ev.updated_at||"",
-   prices:ev.prices||[]
+   inplay:Boolean(ev.inplay??ev.is_live??ev.live),
+   updated_at:ev.updated_at||ev.last_update||"",
+   prices:Array.isArray(ev.prices)?ev.prices:Array.isArray(ev.outcomes)?ev.outcomes:[]
   }));
-  if(!Array.isArray(latestOdds)||!latestOdds.length)throw new Error("The feed returned no recognized fixtures. Check FanLine response format/plan.");
+  if(!latestOdds.length)throw new Error("FanLine responded, but no market rows were found. Check the /api/odds response shape.");
+  const nflCount=latestOdds.filter(ev=>/nfl|football/i.test(ev.sport||"")).length;
+  if(!nflCount)throw new Error("Feed loaded ("+latestOdds.length+" market rows), but no NFL/American-football markets were returned for this plan/board.");
   status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
   renderOdds();
  }catch(err){
