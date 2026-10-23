@@ -164,7 +164,20 @@ function savedTeamForSelection(ev,p){
   const saved=map[[...base,teamKey(name)].join("|")];
   if(saved&&ids.includes(String(saved)))return name;
  }
+ // Use a direct team label if provider actually supplies one.
+ const label=teamKey(p.name||"");
+ if(label&&!/^\d+$/.test(label)){
+  for(const name of [g.away,g.home])if(teamAliases(name).some(a=>label===a||label.includes(a)||a.includes(label)))return name;
+ }
  return "";
+}
+function bindSelectionToTeam(selectionId,teamName){
+ const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
+ if(!g||!selectionId)return;
+ const map=savedSelectionMap(),base=[teamKey(g.away),teamKey(g.home)];
+ map[[...base,teamKey(teamName)].join("|")]=String(selectionId);
+ localStorage.setItem("nflOddsSelectionMap",JSON.stringify(map));
+ prefillOriginalMoneyline();renderOdds();
 }
 function findSelectionPrice(teamName){
  const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
@@ -320,17 +333,15 @@ function renderOdds(){
   return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
    prices.map(p=>{
     let display=p.name||"";
-    if(!display||/^\\d+$/.test(String(display).trim())){
-     display=savedTeamForSelection(ev,p);
-     if(!display){
-      const verified=prices.filter(x=>savedTeamForSelection(ev,x));
-      if(/money ?line|match winner|winner/i.test(String(ev.market||""))&&prices.length===2&&verified.length===1){
-       const known=savedTeamForSelection(ev,verified[0]);
-       display=outcomeIds(p).some(id=>outcomeIds(verified[0]).includes(id))?known:(known===$("team").value?$("opponent").value:$("team").value);
-      }
-     }
-    }
-    return '<div class="row"><span>'+esc(display||"Unmatched selection")+'</span><b>'+american(p.american)+'</b></div>';
+    if(!display||/^\\d+$/.test(String(display).trim()))display=savedTeamForSelection(ev,p);
+    const id=outcomeIds(p)[0]||"";
+    const gameIdx=$("matchup").value, gameObj=gameIdx!==""?scheduleEvents[Number(gameIdx)]:null;
+    const isMoney=/money ?line|match winner|winner/i.test(String(ev.market||""));
+    const assignControls=isMoney&&gameObj&&id&&!display?
+     '<div class="status">Selection ID '+esc(id)+' — assign only after verifying its team in the sportsbook/feed:</div>'+
+     '<div class="two"><button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.away).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.away)+'</button>'+
+     '<button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.home).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.home)+'</button></div>':'';
+    return '<div class="row"><span>'+esc(display||"Unmatched selection")+'</span><b>'+american(p.american)+'</b></div>'+assignControls;
    }).join("")+
    '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
  }).join("");
