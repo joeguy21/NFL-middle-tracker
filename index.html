@@ -330,6 +330,22 @@ async function refreshOdds(){
     Array.isArray(ev.outcomes)?ev.outcomes:
     Array.isArray(ev.selections)?ev.selections:
     Array.isArray(marketObj?.outcomes)?marketObj.outcomes:[];
+   const participants=ev.participants||ev.competitors||ev.teams||[];
+   // Resolve numeric selections only when participant IDs explicitly match.
+   const participantById=new Map();
+   (Array.isArray(participants)?participants:[]).forEach(t=>{
+    if(!t||typeof t!=="object")return;
+    const nm=t.display_name||t.name||t.full_name||t.abbreviation||t.short_name||"";
+    [t.id,t.participant_id,t.team_id,t.selection_id,t.outcome_id].filter(v=>v!==undefined&&v!==null).forEach(id=>participantById.set(String(id),nm));
+   });
+   const normalized=rawPrices.map(p=>{
+    const out=normalizeOutcome(p);
+    if(!out.name){
+     const candidate=participantById.get(out.selection)||participantById.get(out.participantId);
+     if(candidate)out.name=String(candidate);
+    }
+    return out;
+   });
    return {
     sport:ev.sport||ev.league||ev.sport_name||ev.sport_key||"",
     fixture:ev.fixture||ev.fixture_name||ev.name||ev.event_name||ev.event||ev.matchup||"",
@@ -338,8 +354,8 @@ async function refreshOdds(){
     inplay:Boolean(ev.inplay??ev.is_live??ev.live??ev.in_play),
     updated_at:ev.updated_at||ev.last_update||ev.updated||"",
     fixtureId:String(ev.fixture_id??ev.event_id??ev.id??""),
-    participants:ev.participants||ev.competitors||ev.teams||[],
-    prices:rawPrices.map(normalizeOutcome)
+    participants:participants,
+    prices:normalized
    };
   });
   if(!latestOdds.length)throw new Error("FanLine market list was empty at "+rowsKey+".");
