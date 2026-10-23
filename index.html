@@ -180,8 +180,10 @@ function findSelectionPrice(teamName){
  // Compare the precise stored selection/participant ID, not every unrelated ID
  // attached to an outcome (which can collide with another market's identifiers).
  if(saved){
+  // Only match the exact saved selection key. Participant/team IDs may be
+  // shared or mapped differently by feed versions and can return the wrong side.
   for(const ev of markets)for(const p of (ev.prices||[])){
-   if([p.selection,p.participantId].filter(v=>v!==undefined&&v!==null).map(String).includes(String(saved))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
+   if(p.selection!==undefined&&String(p.selection)===String(saved)&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
     return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
   }
  }
@@ -217,27 +219,8 @@ function prefillOriginalMoneyline(){
   const outcomes=fixtureRows.flatMap(ev=>(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0).map(p=>({p,ev})));
   if(outcomes.length){
    note.className="status";
-   note.textContent="The live moneyline is here, but the provider is returning selection IDs rather than team names. Tap the matching price after checking which selection is your team in the sportsbook:";
-   const choices=document.createElement("div");choices.id="oddsChoices";
-   choices.style.cssText="display:grid;gap:8px;margin:8px 0";
-   outcomes.forEach(({p,ev},i)=>{
-    const label=p.name&&!/^\\d+$/.test(p.name)?p.name:(p.selection||"Selection ID");
-    const btn=document.createElement("button");btn.type="button";btn.className="secondary";
-    btn.textContent=label+" · "+(Number(p.american)>0?"+":"")+p.american;
-    btn.addEventListener("click",()=>{
-     $("odds").value=Number(p.american);
-     // Remember which feed selection the user verified as this team for this matchup.
-     const map=savedSelectionMap(), key=oddsMapKey($("team").value);
-     if(key)map[key]=String(p.selection||p.participantId||"");
-     localStorage.setItem("nflOddsSelectionMap",JSON.stringify(map));
-     const help=$("oddsHelp");help.className="status good";
-     help.textContent="Saved this selection for "+$("team").value+". Future refreshes will fill its live price automatically. Verify against your accepted ticket.";
-     choices.querySelectorAll("button").forEach(b=>b.style.outline="");
-     btn.style.outline="2px solid #39d98a";
-    });
-    choices.appendChild(btn);
-   });
-   $("odds").insertAdjacentElement("afterend",note);note.insertAdjacentElement("afterend",choices);
+   note.textContent="The feed has prices but this team’s selection is not safely identified. No odds were auto-filled to avoid assigning the opponent’s price. This feed needs team-labeled outcomes or a verified selection mapping.";
+   $("odds").insertAdjacentElement("afterend",note);
    return;
   }
   note.textContent="No matching live moneyline selection for "+team+". Confirm the selected matchup and refresh the odds feed.";
