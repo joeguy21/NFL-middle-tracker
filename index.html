@@ -217,7 +217,7 @@ $("calcButton").addEventListener("click",calculate);
 let latestOdds=[];
 function american(v){const n=Number(v);return Number.isFinite(n)?(n>0?"+":"")+n:"—"}
 function teamKey(s){
- return String(s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\\s+/g," ").trim();
+ return String(s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 }
 function teamAliases(name){
  const clean=teamKey(name), words=clean.split(" ");
@@ -250,7 +250,7 @@ function renderOdds(){
  const away=teamAliases(chosen.away),home=teamAliases(chosen.home);
  const matches=latestOdds.filter(ev=>{
   const fixture=teamKey(ev.fixture),sport=String(ev.sport||"").toLowerCase();
-  if(!(/nfl|football/i.test(sport)||/\\bnfl\\b|football/i.test(fixture)))return false;
+  if(!(/nfl|football/i.test(sport)||/\bnfl\b|football/i.test(fixture)))return false;
   const correctTeams=away.some(x=>fixture.includes(x))&&home.some(x=>fixture.includes(x));
   const text=[ev.sport,ev.fixture].join(" ").toLowerCase();
   return correctTeams&&(!q||text.includes(q));
