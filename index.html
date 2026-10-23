@@ -174,7 +174,36 @@ function prefillOriginalMoneyline(){
   $("odds").insertAdjacentElement("afterend",note);
  }else{
   const note=$("oddsHelp")||document.createElement("p");note.id="oddsHelp";note.className="status";
-  note.textContent="No safely matched moneyline selection for "+team+". The feed may provide only selection IDs; enter the ticket's actual odds.";
+  const idx=$("matchup").value, chosen=idx!==""?scheduleEvents[Number(idx)]:null;
+  const a=chosen?teamAliases(chosen.away):[], h=chosen?teamAliases(chosen.home):[];
+  const fixtureRows=chosen?latestOdds.filter(ev=>{
+   const fx=teamKey(ev.fixture);
+   return /money ?line|match winner|winner/i.test(String(ev.market||"")) &&
+    a.some(x=>fx.includes(x))&&h.some(x=>fx.includes(x));
+  }):[];
+  const outcomes=fixtureRows.flatMap(ev=>(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0).map(p=>({p,ev})));
+  if(outcomes.length){
+   note.className="status";
+   note.textContent="The live moneyline is here, but the provider is returning selection IDs rather than team names. Tap the matching price after checking which selection is your team in the sportsbook:";
+   const choices=document.createElement("div");choices.id="oddsChoices";
+   choices.style.cssText="display:grid;gap:8px;margin:8px 0";
+   outcomes.forEach(({p,ev},i)=>{
+    const label=p.name&&!/^\\d+$/.test(p.name)?p.name:(p.selection||"Selection ID");
+    const btn=document.createElement("button");btn.type="button";btn.className="secondary";
+    btn.textContent=label+" · "+(Number(p.american)>0?"+":"")+p.american;
+    btn.addEventListener("click",()=>{
+     $("odds").value=Number(p.american);
+     const help=$("oddsHelp");help.className="status good";
+     help.textContent="Copied live price "+(Number(p.american)>0?"+":"")+p.american+" from "+(ev.fixture||"selected matchup")+". Confirm this outcome is "+$("team").value+" and verify the accepted ticket price.";
+     choices.querySelectorAll("button").forEach(b=>b.style.outline="");
+     btn.style.outline="2px solid #39d98a";
+    });
+    choices.appendChild(btn);
+   });
+   $("odds").insertAdjacentElement("afterend",note);note.insertAdjacentElement("afterend",choices);
+   return;
+  }
+  note.textContent="No matching live moneyline selection for "+team+". Confirm the selected matchup and refresh the odds feed.";
   $("odds").insertAdjacentElement("afterend",note);
  }
 }
