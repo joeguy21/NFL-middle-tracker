@@ -1,427 +1,176 @@
-
-
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
 <meta charset="UTF-8">
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NFL Middle Tracker</title>
-
 <style>
-
 *{box-sizing:border-box}
-
 body{margin:0;background:#101827;color:#f5f7fb;font:16px Arial,sans-serif}
-
-header{background:#182438;padding:22px 16px;border-bottom:2px solid #39d98a}
-
-h1{margin:0;font-size:25px}
-
-small,.muted{color:#aab6ca}
-
-main{max-width:650px;margin:auto;padding:16px}
-
-.card{background:#1b293e;border:1px solid #34445e;
-
-border-radius:14px;padding:16px;margin-bottom:16px}
-
-h2{font-size:19px;margin-top:0}
-
+header{background:#182438;padding:22px 16px;border-bottom:3px solid #39d98a}
+h1{margin:0;font-size:25px}small,.muted{color:#aab6ca}
+main{max-width:700px;margin:auto;padding:16px}
+.card{background:#1b293e;border:1px solid #34445e;border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:19px;margin:0 0 12px}
 label{display:block;font-size:13px;color:#c1ccdc;margin:12px 0 5px}
-
-input,select{width:100%;padding:12px;border-radius:8px;
-
-border:1px solid #53627a;background:#101827;color:white;font-size:16px}
-
-button{border:0;border-radius:9px;padding:13px;font-weight:bold;
-
-font-size:15px;cursor:pointer}
-
+input,select{width:100%;padding:12px;border-radius:8px;border:1px solid #53627a;background:#101827;color:white;font-size:16px}
+button{border:0;border-radius:9px;padding:13px;font-weight:bold;font-size:15px;cursor:pointer}
 .primary{background:#39d98a;color:#10251c;width:100%;margin-top:15px}
-
+.secondary{background:#34445e;color:#fff;width:100%;margin-top:10px}
 .lock{background:#f2c94c;color:#191919;width:100%;margin-top:10px}
-
 .delete{background:#482a35;color:#ffb8c5;margin-top:10px}
-
 .stat{font-size:26px;font-weight:bold;color:#39d98a;margin-top:5px}
-
 .result{padding:12px;background:#101827;border-radius:8px;margin-top:10px}
-
-.row{display:flex;justify-content:space-between;gap:12px}
-
+.row{display:flex;justify-content:space-between;gap:12px;margin:6px 0}
 hr{border:0;border-top:1px solid #34445e;margin:15px 0}
-
-.good{color:#39d98a}.bad{color:#ff8888}
-
-.locked{color:#f2c94c;font-weight:bold}
-
-footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px}
-
+.good{color:#39d98a}.bad{color:#ff8888}.locked{color:#f2c94c;font-weight:bold}
+.notice{padding:10px;border-radius:8px;background:#101827;color:#aab6ca;font-size:13px;line-height:1.45;margin-top:12px}
+.status{font-size:13px;margin:8px 0;color:#aab6ca}
+footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
+@media(min-width:600px){.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.two>div{min-width:0}}
 </style>
-
 </head>
-
 <body>
-
-<header>
-
-<h1>🏈 NFL Middle Tracker</h1>
-
-<small>Hedge • Middle • Manage Risk</small>
-
-</header>
-
+<header><h1>🏈 NFL Middle Tracker</h1><small>Hedge • Middle • Manage Risk</small></header>
 <main>
-
-<div class="card">
-
+<section class="card">
 <h2>Dashboard</h2>
-
 <div class="row"><span>Tracked games</span><b id="count">0</b></div>
+<div class="row"><span>Recorded exposure*</span><b id="exposure">$0.00</b></div>
+<p class="muted" style="margin-bottom:0">*Based on the original stake and saved suggested hedge in each record.</p>
+</section>
 
-<div class="row" style="margin-top:12px">
-
-<span>Recorded stakes</span><b id="exposure">$0.00</b>
-
+<section class="card">
+<h2>Choose a game</h2>
+<div class="two">
+<div><label for="week">NFL regular-season week</label>
+<select id="week"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7</option><option value="8" selected>Week 8</option><option value="9">Week 9</option><option value="10">Week 10</option><option value="11">Week 11</option><option value="12">Week 12</option><option value="13">Week 13</option><option value="14">Week 14</option><option value="15">Week 15</option><option value="16">Week 16</option><option value="17">Week 17</option><option value="18">Week 18</option></select></div>
+<div><label for="season">Season</label><select id="season"><option value="2026" selected>2026</option><option value="2025">2025</option></select></div>
 </div>
+<button class="secondary" type="button" id="loadGames">LOAD WEEK'S GAMES</button>
+<p class="status" id="scheduleStatus">Choose a week and load the matchups.</p>
+<label for="matchup">Scheduled matchup</label>
+<select id="matchup"><option value="">Load the week's games first</option></select>
+<label for="side">Team you bet / want to price</label>
+<select id="side" disabled><option value="">Choose a matchup first</option></select>
+<div class="notice">Selecting a matchup and team automatically fills the game name and opposing team below. The scheduled-game list is loaded from ESPN's public scoreboard service; it is not a sportsbook odds feed.</div>
+</section>
 
-<p class="muted">Demo calculator • Manual odds</p>
-
+<section class="card">
+<h2>Enter original bet</h2>
+<label for="game">Game</label><input id="game" placeholder="Select a scheduled game above, or type one">
+<label for="team">Team / side you bet</label><input id="team" placeholder="Select a team above, or type one">
+<label for="opponent">Opposing team</label><input id="opponent" placeholder="Auto-filled when a scheduled team is selected">
+<div class="two">
+<div><label for="book">Original sportsbook</label><select id="book"><option>FanDuel</option><option>DraftKings</option><option>Hard Rock Bet</option></select></div>
+<div><label for="type">Original bet type</label><select id="type"><option value="ML">Moneyline</option><option value="spread" disabled>Spread (coming later)</option></select></div>
 </div>
-
-<div class="card">
-
-<h2>Enter Original Bet</h2>
-
-<label>Game name</label>
-
-<input id="game" placeholder="Example: Steelers vs Bengals">
-
-<label>Team / side you bet</label>
-
-<input id="team" placeholder="Example: Steelers">
-
-<label>Original sportsbook</label>
-
-<select id="book">
-
-<option>FanDuel</option><option>DraftKings</option>
-
-<option>Hard Rock Bet</option>
-
-</select>
-
-<label>Original bet type</label>
-
-<select id="type">
-
-<option value="ML">Moneyline</option>
-
-</select>
-
-<label>Original American odds</label>
-
-<input id="odds" type="number" placeholder="-110">
-
-<label>Actual stake ($)</label>
-
-<input id="stake" type="number" min="0.01" step=".01" placeholder="Your actual wager">
-
-<label>Opposing team</label>
-
-<input id="opponent" placeholder="Example: Bengals">
-
-<label>Hedge sportsbook</label>
-
-<select id="hedgeBook">
-
-<option>FanDuel</option><option>DraftKings</option>
-
-<option>Hard Rock Bet</option>
-
-</select>
-
-<label>Opposing odds (American)</label>
-
-<input id="hedgeOdds" type="number" placeholder="-105">
-
-<button class="primary" onclick="calculate()">CALCULATE HEDGE</button>
-
+<div class="two">
+<div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="+110"></div>
+<div><label for="stake">Actual stake ($)</label><input id="stake" type="number" min="0.01" step="0.01" placeholder="Enter your actual amount"></div>
+</div>
+<hr>
+<h2>Potential hedge</h2>
+<div class="two">
+<div><label for="hedgeBook">Hedge sportsbook</label><select id="hedgeBook"><option>FanDuel</option><option>DraftKings</option><option>Hard Rock Bet</option></select></div>
+<div><label for="hedgeOdds">Opposing odds (American)</label><input id="hedgeOdds" type="number" placeholder="-105"></div>
+</div>
+<button class="primary" type="button" id="calcButton">CALCULATE HEDGE</button>
 <div id="calc"></div>
+<div class="notice"><b>Live odds are not connected yet.</b> For now, enter the current price shown by your sportsbook. This page does not access your sportsbook account, place bets, or verify that a price is still available. A live odds feed requires a supported data provider and a securely stored API key on a backend; it should not be put in this public page's code.</div>
+</section>
 
-</div>
-
-<div class="card">
-
-<h2>My Tracked Games</h2>
-
-<div id="games"><p class="muted">No bets recorded yet.</p></div>
-
-</div>
-
-<footer>
-
-Calculations are estimates from manually entered odds.
-
-No live feeds or wagers are connected. Verify all terms and prices.
-
-</footer>
-
+<section class="card">
+<h2>My tracked games</h2><div id="games"><p class="muted">No bets recorded yet.</p></div>
+</section>
+<footer>Hedge estimates use manually entered American odds and assume opposite outcomes settle normally. Confirm market type, accepted price, limits, pushes/voids, and actual bet receipt before relying on a result. Saved records remain in this browser's local storage; they are not written into the public GitHub repository.</footer>
 </main>
-
 <script>
-
 let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
-
-let pending=null;
-
-function dec(a){
-
- a=Number(a);
-
- if(!a||!Number.isFinite(a))return null;
-
- return a>0?1+a/100:1+100/Math.abs(a);
-
+let pending=null, scheduleEvents=[];
+const $=id=>document.getElementById(id);
+function dec(a){a=Number(a);if(!a||!Number.isFinite(a))return null;return a>0?1+a/100:1+100/Math.abs(a)}
+function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
+function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render()}
+function teamsFromEvent(ev){
+ const comps=ev.competitions?.[0]?.competitors||[];
+ const away=comps.find(c=>c.homeAway==="away")||comps[0];
+ const home=comps.find(c=>c.homeAway==="home")||comps[1];
+ const teamName=c=>c?.team?.displayName||c?.team?.name||c?.team?.abbreviation||"";
+ return {away:teamName(away),home:teamName(home),date:ev.date||"",id:ev.id,name:ev.name||""};
 }
-
-function money(n){
-
- return n.toLocaleString("en-US",{style:"currency",currency:"USD"});
-
+async function loadGames(){
+ const week=$("week").value, season=$("season").value, select=$("matchup"), status=$("scheduleStatus");
+ select.innerHTML='<option value="">Loading matchups…</option>'; $("side").disabled=true;
+ status.textContent="Getting scheduled games…";
+ try{
+  const url="https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates="+encodeURIComponent(season)+"&seasontype=2&week="+encodeURIComponent(week);
+  const res=await fetch(url,{cache:"no-store"});
+  if(!res.ok)throw new Error("Schedule service returned "+res.status);
+  const data=await res.json(); scheduleEvents=(data.events||[]).map(ev=>({raw:ev,...teamsFromEvent(ev)})).filter(g=>g.away&&g.home);
+  select.innerHTML="";
+  if(!scheduleEvents.length){select.innerHTML='<option value="">No games returned for this week</option>';status.textContent="No games were returned. You can still type the teams manually.";return}
+  select.append(new Option("Select a matchup…",""));
+  scheduleEvents.forEach((g,i)=>{const when=g.date?new Date(g.date).toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";select.append(new Option(g.away+" at "+g.home+(when?" — "+when:""),String(i)))});
+  status.textContent="Loaded "+scheduleEvents.length+" matchup(s) for Week "+week+", "+season+".";
+ }catch(err){
+  scheduleEvents=[];select.innerHTML='<option value="">Schedule could not load</option>';
+  status.textContent="Could not load schedule in this browser. You can still type the matchup and teams manually.";
+ }
 }
-
-function save(){
-
- localStorage.setItem("nfltracker",JSON.stringify(bets));
-
- render();
-
+function fillTeams(){
+ const idx=$("matchup").value, side=$("side");
+ if(idx===""){side.innerHTML='<option value="">Choose a matchup first</option>';side.disabled=true;return}
+ const g=scheduleEvents[Number(idx)];if(!g)return;
+ side.disabled=false;side.innerHTML="";
+ side.append(new Option("Select your team…",""));
+ side.append(new Option(g.away,"away"));side.append(new Option(g.home,"home"));
+ $("game").value=g.away+" vs "+g.home;
+ $("team").value="";$("opponent").value="";
 }
-
+function fillOpponent(){
+ const idx=$("matchup").value, s=$("side").value;
+ if(idx===""||!s)return;
+ const g=scheduleEvents[Number(idx)];if(!g)return;
+ $("team").value=s==="away"?g.away:g.home;
+ $("opponent").value=s==="away"?g.home:g.away;
+}
 function calculate(){
-
- let game=document.getElementById("game").value.trim();
-
- let team=document.getElementById("team").value.trim();
-
- let opp=document.getElementById("opponent").value.trim();
-
- let book=document.getElementById("book").value;
-
- let hb=document.getElementById("hedgeBook").value;
-
- let a=Number(document.getElementById("odds").value);
-
- let b=Number(document.getElementById("hedgeOdds").value);
-
- let s=Number(document.getElementById("stake").value);
-
- let d=dec(a),e=dec(b);
-
- let out=document.getElementById("calc");
-
- pending=null;
-
- if(!game||!team||!opp||!d||!e||s<=0||!Number.isFinite(s)){
-
- out.innerHTML='<p class="bad">Enter game, teams, valid odds and stake.</p>';return;
-
- }
-
- if(team.toLowerCase()===opp.toLowerCase()){
-
- out.innerHTML='<p class="bad">Enter two different sides.</p>';return;
-
- }
-
- // Equalize total returns on either side.
-
- let h=Math.round(s*d/e*100)/100;
-
- let win1=Math.round((s*(d-1)-h)*100)/100;
-
- let win2=Math.round((-s+h*(e-1))*100)/100;
-
- let guaranteed=Math.min(win1,win2);
-
- let total=s+h;
-
- let roi=guaranteed/total*100;
-
- pending={game,team,opp,book,hb,a,b,s,h,win1,win2,
-
- guaranteed,roi,locked:false,id:Date.now()};
-
- out.innerHTML=`
-
- <div class="result">
-
- <div class="row"><span>Original bet</span><b>${money(s)}</b></div>
-
- <div class="row"><span>Recommended hedge</span><b>${money(h)}</b></div>
-
- <div class="row"><span>Hedge book</span><b>${hb}</b></div>
-
- <hr>
-
- <div class="row"><span>Total stakes</span><b>${money(total)}</b></div>
-
- <div class="row"><span>${team} wins</span><b class="${win1>=0?'good':'bad'}">${money(win1)}</b></div>
-
- <div class="row"><span>${opp} wins</span><b class="${win2>=0?'good':'bad'}">${money(win2)}</b></div>
-
- <hr>
-
- <div>Worst-case net</div>
-
- <div class="stat">${money(guaranteed)}</div>
-
- <p>Estimated ROI: ${roi.toFixed(2)}%</p>
-
- </div>
-
- <p class="muted">Equal-return hedge, rounded to cents.
-
-Verify market rules, accepted price and limits.</p>
-
- <button class="primary" onclick="record()">SAVE RECOMMENDATION</button>
-
- `;
-
+ const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
+ const book=$("book").value,hb=$("hedgeBook").value,a=Number($("odds").value),b=Number($("hedgeOdds").value),s=Number($("stake").value);
+ const d=dec(a),e=dec(b),out=$("calc");pending=null;
+ if(!game||!team||!opp||!d||!e||s<=0||!Number.isFinite(s)){out.innerHTML='<p class="bad">Enter game, both teams, valid odds and your actual stake.</p>';return}
+ if(team.toLowerCase()===opp.toLowerCase()){out.innerHTML='<p class="bad">The selected team and opponent must be different.</p>';return}
+ const h=Math.round(s*d/e*100)/100;
+ const win1=Math.round((s*(d-1)-h)*100)/100;
+ const win2=Math.round((-s+h*(e-1))*100)/100;
+ const guaranteed=Math.min(win1,win2),total=s+h,roi=guaranteed/total*100;
+ pending={game,team,opp,book,hb,a,b,s,h,win1,win2,guaranteed,roi,locked:false,id:Date.now()};
+ out.innerHTML='<div class="result"><div class="row"><span>Original bet</span><b>'+money(s)+'</b></div><div class="row"><span>Suggested opposing hedge</span><b>'+money(h)+'</b></div><div class="row"><span>Hedge book</span><b>'+esc(hb)+'</b></div><hr><div class="row"><span>Total stakes</span><b>'+money(total)+'</b></div><div class="row"><span>'+esc(team)+' wins</span><b class="'+(win1>=0?'good':'bad')+'">'+money(win1)+'</b></div><div class="row"><span>'+esc(opp)+' wins</span><b class="'+(win2>=0?'good':'bad')+'">'+money(win2)+'</b></div><hr><div>Worst-case net estimate</div><div class="stat">'+money(guaranteed)+'</div><p>Estimated ROI: '+roi.toFixed(2)+'%</p></div><p class="muted">Equal-return hedge, rounded to cents. This is based on the prices you typed in, not live-verified odds.</p><button class="primary" type="button" id="saveRec">SAVE RECOMMENDATION</button>';
+ $("saveRec").addEventListener("click",record);
 }
-
 function record(){
-
  if(!pending)return;
-
- if(bets.some(x=>x.game.toLowerCase()===pending.game.toLowerCase()
-
- &&!x.locked)){
-
- alert("This game already has an open record.");
-
- return;
-
- }
-
- bets.push(pending);
-
- pending=null;
-
- document.getElementById("calc").innerHTML=
-
- "<p class='good'>Recommendation saved.</p>";
-
- save();
-
+ if(bets.some(x=>x.game.toLowerCase()===pending.game.toLowerCase()&&!x.locked)){alert("This game already has an open record. Reopen or lock the existing record before saving another.");return}
+ bets.push(pending);pending=null;$("calc").innerHTML="<p class='good'>Recommendation saved.</p>";save();
 }
-
-function lockGame(id){
-
- let g=bets.find(x=>x.id===id);
-
- if(!g)return;
-
- if(!confirm("Lock this game and stop future recommendations?"))return;
-
- g.locked=true;
-
- g.lockedAt=new Date().toISOString();
-
- save();
-
-}
-
-function reopen(id){
-
- let g=bets.find(x=>x.id===id);
-
- if(!g)return;
-
- if(!confirm("Reopen this game for calculations?"))return;
-
- g.locked=false;
-
- save();
-
-}
-
-function removeGame(id){
-
- if(!confirm("Delete this demo record?"))return;
-
- bets=bets.filter(x=>x.id!==id);
-
- save();
-
-}
-
+function lockGame(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Lock this game and stop future recommendations for it?"))return;g.locked=true;g.lockedAt=new Date().toISOString();save()}
+function reopen(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Reopen this game for calculations?"))return;g.locked=false;save()}
+function removeGame(id){if(!confirm("Delete this saved browser record?"))return;bets=bets.filter(x=>x.id!==id);save()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
-
- document.getElementById("count").textContent=bets.length;
-
- document.getElementById("exposure").textContent=
-
- money(bets.reduce((n,x)=>n+x.s+x.h,0));
-
- let el=document.getElementById("games");
-
- if(!bets.length){
-
- el.innerHTML='<p class="muted">No bets recorded yet.</p>';return;
-
- }
-
- el.innerHTML=bets.map(g=>`
-
- <div class="result">
-
- <div class="row"><b>${esc(g.game)}</b>
-
- <span class="${g.locked?'locked':'good'}">${g.locked?'LOCKED':'OPEN'}</span></div>
-
- <p>${esc(g.team)} vs ${esc(g.opp)}</p>
-
- <p class="muted">Original: ${money(g.s)} @ ${g.a>0?'+':''}${g.a}
-
- (${esc(g.book)})</p>
-
- <p class="muted">Suggested hedge: ${money(g.h)} @ ${g.b>0?'+':''}${g.b}
-
- (${esc(g.hb)})</p>
-
- <p>Worst-case estimate: <b>${money(g.guaranteed)}</b></p>
-
- ${g.locked?`<button class="primary" onclick="reopen(${g.id})">REOPEN GAME</button>`
-
- :`<button class="lock" onclick="lockGame(${g.id})">I BET THIS — LOCK GAME</button>`}
-
- <button class="delete" onclick="removeGame(${g.id})">Delete demo record</button>
-
- </div>`).join("");
-
+ $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
+ const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
+ el.innerHTML=bets.map(g=>'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
 }
-
-function esc(s){
-
- return String(s).replace(/[&<>"']/g,c=>({
-
- '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-
- }[c]));
-
-}
-
+$("loadGames").addEventListener("click",loadGames);
+$("week").addEventListener("change",loadGames);
+$("season").addEventListener("change",loadGames);
+$("matchup").addEventListener("change",fillTeams);
+$("side").addEventListener("change",fillOpponent);
+$("calcButton").addEventListener("click",calculate);
 render();
-
+loadGames();
 </script>
-
 </body>
-
 </html>
