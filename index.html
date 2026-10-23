@@ -146,6 +146,37 @@ function fillOpponent(){
  const g=scheduleEvents[Number(idx)];if(!g)return;
  $("team").value=s==="away"?g.away:g.home;
  $("opponent").value=s==="away"?g.home:g.away;
+ prefillOriginalMoneyline();
+}
+function findSelectionPrice(teamName){
+ const aliases=teamAliases(teamName);
+ const markets=latestOdds.filter(ev=>/money ?line|match winner|winner/i.test(String(ev.market||"")));
+ for(const ev of markets){
+  for(const p of (ev.prices||[])){
+   const label=teamKey(p.name||p.selection||p.team||p.outcome||p.label||"");
+   if(label && aliases.some(a=>label===a||label.includes(a)||a.includes(label)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
+    return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+  }
+ }
+ return null;
+}
+function prefillOriginalMoneyline(){
+ if($("type").value!=="ML")return;
+ const team=$("team").value.trim();
+ if(!team)return;
+ const found=findSelectionPrice(team);
+ if(found){
+  $("odds").value=found.odds;
+  $("odds").placeholder="Auto-filled from current feed";
+  $("oddsHelp")?.remove();
+  const note=document.createElement("p");note.id="oddsHelp";note.className="status good";
+  note.textContent="Prefilled from matching live moneyline: "+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Verify against the accepted ticket price.";
+  $("odds").insertAdjacentElement("afterend",note);
+ }else{
+  const note=$("oddsHelp")||document.createElement("p");note.id="oddsHelp";note.className="status";
+  note.textContent="No safely matched moneyline selection for "+team+". The feed may provide only selection IDs; enter the ticket's actual odds.";
+  $("odds").insertAdjacentElement("afterend",note);
+ }
 }
 function calculate(){
  const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
@@ -180,6 +211,7 @@ $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
 $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();});
 $("side").addEventListener("change",fillOpponent);
+$("type").addEventListener("change",prefillOriginalMoneyline);
 $("calcButton").addEventListener("click",calculate);
 
 let latestOdds=[];
@@ -276,6 +308,7 @@ async function refreshOdds(){
   if(!nflCount)throw new Error("Feed loaded ("+latestOdds.length+" market rows), but no NFL/American-football markets were returned for this plan/board.");
   status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
   renderOdds();
+  prefillOriginalMoneyline();
  }catch(err){
   status.textContent="Unavailable";
   board.innerHTML='<p class="bad">'+esc(err.message||"Odds could not load")+'</p>';
