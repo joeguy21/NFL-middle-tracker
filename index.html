@@ -167,12 +167,25 @@ function savedTeamForSelection(ev,p){
  return "";
 }
 function findSelectionPrice(teamName){
- const aliases=teamAliases(teamName),markets=latestOdds.filter(ev=>/money ?line|match winner|winner/i.test(String(ev.market||"")));
- const key=oddsMapKey(teamName), saved=savedSelectionMap()[key];
- if(saved)for(const ev of markets)for(const p of (ev.prices||[])){
-  if(outcomeIds(p).includes(String(saved))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
-   return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+ const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
+ if(!g)return null;
+ const away=teamAliases(g.away),home=teamAliases(g.home);
+ const markets=latestOdds.filter(ev=>{
+  const fixture=teamKey(ev.fixture||"");
+  return /money ?line|match winner|winner/i.test(String(ev.market||""))&&
+   away.some(a=>fixture.includes(a))&&home.some(h=>fixture.includes(h));
+ });
+ const key=oddsMapKey(teamName),saved=savedSelectionMap()[key];
+ // A remembered selection is valid only inside the selected game's moneyline.
+ // Compare the precise stored selection/participant ID, not every unrelated ID
+ // attached to an outcome (which can collide with another market's identifiers).
+ if(saved){
+  for(const ev of markets)for(const p of (ev.prices||[])){
+   if([p.selection,p.participantId].filter(v=>v!==undefined&&v!==null).map(String).includes(String(saved))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
+    return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+  }
  }
+ const aliases=teamAliases(teamName);
  for(const ev of markets)for(const p of (ev.prices||[])){
   const label=teamKey(p.name||"");
   if(label&&!/^\\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
