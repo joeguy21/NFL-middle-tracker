@@ -294,15 +294,54 @@ async function refreshOdds(){
    const nested= data?.data&&typeof data.data==="object"?Object.keys(data.data).join(", "):"none";
    throw new Error("No market list found. Top-level fields: "+keys+". data fields: "+nested+".");
   }
-  latestOdds=rows.map(ev=>({
-   sport:ev.sport||ev.league||ev.sport_name||"",
-   fixture:ev.fixture||ev.name||ev.event||ev.matchup||"",
-   market:ev.market||ev.market_name||"",
-   status:ev.status||"",
-   inplay:Boolean(ev.inplay??ev.is_live??ev.live),
-   updated_at:ev.updated_at||ev.last_update||"",
-   prices:Array.isArray(ev.prices)?ev.prices:Array.isArray(ev.outcomes)?ev.outcomes:[]
-  }));
+  // Normalize FanLine variants without treating selection IDs as team names.
+  // Odds fields may arrive as American prices, decimal prices, or nested price objects.
+  function toAmerican(raw){
+   if(raw&&typeof raw==="object") raw=raw.american??raw.us??raw.value??raw.price??raw.odds;
+   if(typeof raw==="string") raw=raw.trim().replace(/^US\\s*/i,"");
+   const n=Number(raw);
+   if(!Number.isFinite(n)||n===0)return null;
+   if(n<=-100||n>=100)return Math.round(n);
+   if(n>1)return Math.round(n>=2?(n-1)*100:-100/(n-1));
+   return null;
+  }
+  function normalizeOutcome(p){
+   const participant=p.participant||p.competitor||p.team||{};
+   const label=p.name||p.selection_name||p.outcome_name||p.team_name||
+    participant.display_name||participant.name||participant.abbreviation||
+    (typeof p.selection==="string"?p.selection:"")||
+    (typeof p.outcome==="string"?p.outcome:"")||"";
+   const rawOdds=p.american??p.american_odds??p.us_odds??p.odds_american??
+    p.price_american??p.odds??p.price??p.decimal_odds??p.decimal_price;
+   const priceObject=rawOdds&&typeof rawOdds==="object"?rawOdds:null;
+   const americanOdds=toAmerican(rawOdds);
+   return {
+    name:String(label||""),
+    selection:String(p.selection_id??p.outcome_id??p.id??p.selection??""),
+    participantId:String(participant.id??p.participant_id??p.team_id??""),
+    american:americanOdds,
+    rawOdds:rawOdds,
+    point:p.point??p.points??p.handicap??null
+   };
+  }
+  latestOdds=rows.map(ev=>{
+   const marketObj=ev.market&&typeof ev.market==="object"?ev.market:null;
+   const rawPrices=Array.isArray(ev.prices)?ev.prices:
+    Array.isArray(ev.outcomes)?ev.outcomes:
+    Array.isArray(ev.selections)?ev.selections:
+    Array.isArray(marketObj?.outcomes)?marketObj.outcomes:[];
+   return {
+    sport:ev.sport||ev.league||ev.sport_name||ev.sport_key||"",
+    fixture:ev.fixture||ev.fixture_name||ev.name||ev.event_name||ev.event||ev.matchup||"",
+    market:typeof ev.market==="string"?ev.market:(marketObj?.name||marketObj?.market_name||ev.market_name||ev.market_type||""),
+    status:ev.status||"",
+    inplay:Boolean(ev.inplay??ev.is_live??ev.live??ev.in_play),
+    updated_at:ev.updated_at||ev.last_update||ev.updated||"",
+    fixtureId:String(ev.fixture_id??ev.event_id??ev.id??""),
+    participants:ev.participants||ev.competitors||ev.teams||[],
+    prices:rawPrices.map(normalizeOutcome)
+   };
+  });
   if(!latestOdds.length)throw new Error("FanLine market list was empty at "+rowsKey+".");
   const nflCount=latestOdds.filter(ev=>/nfl|football/i.test(ev.sport||"")).length;
   if(!nflCount)throw new Error("Feed loaded ("+latestOdds.length+" market rows), but no NFL/American-football markets were returned for this plan/board.");
