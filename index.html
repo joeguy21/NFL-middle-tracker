@@ -34,6 +34,22 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <header><h1>🏈 NFL Middle Tracker</h1><small>Hedge • Middle • Manage Risk</small></header>
 <main>
 <section class="card">
+<h2>Choose a game</h2>
+<div class="two">
+<div><label for="week">NFL regular-season week</label>
+<select id="week"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7</option><option value="8" selected>Week 8</option><option value="9">Week 9</option><option value="10">Week 10</option><option value="11">Week 11</option><option value="12">Week 12</option><option value="13">Week 13</option><option value="14">Week 14</option><option value="15">Week 15</option><option value="16">Week 16</option><option value="17">Week 17</option><option value="18">Week 18</option></select></div>
+<div><label for="season">Season</label><select id="season"><option value="2026" selected>2026</option><option value="2025">2025</option></select></div>
+</div>
+<button class="secondary" type="button" id="loadGames">LOAD WEEK'S GAMES</button>
+<p class="status" id="scheduleStatus">Choose a week and load the matchups.</p>
+<label for="matchup">Scheduled matchup</label>
+<select id="matchup"><option value="">Load the week's games first</option></select>
+<label for="side">Team you bet / want to price</label>
+<select id="side" disabled><option value="">Choose a matchup first</option></select>
+<div class="notice">Selecting a matchup and team automatically fills the game name and opposing team below. The scheduled-game list is loaded from ESPN's public scoreboard service; it is not a sportsbook odds feed.</div>
+</section>
+
+<section class="card">
 <h2>Dashboard</h2>
 <div class="row"><span>Tracked games</span><b id="count">0</b></div>
 <div class="row"><span>Recorded exposure*</span><b id="exposure">$0.00</b></div>
@@ -50,21 +66,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div class="notice">This displays FanLine Wire's FanDuel prices. Availability and in-game coverage depend on your FanLine plan and data feed. Confirm prices in your sportsbook before acting.</div>
 </section>
 
-<section class="card">
-<h2>Choose a game</h2>
-<div class="two">
-<div><label for="week">NFL regular-season week</label>
-<select id="week"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7</option><option value="8" selected>Week 8</option><option value="9">Week 9</option><option value="10">Week 10</option><option value="11">Week 11</option><option value="12">Week 12</option><option value="13">Week 13</option><option value="14">Week 14</option><option value="15">Week 15</option><option value="16">Week 16</option><option value="17">Week 17</option><option value="18">Week 18</option></select></div>
-<div><label for="season">Season</label><select id="season"><option value="2026" selected>2026</option><option value="2025">2025</option></select></div>
-</div>
-<button class="secondary" type="button" id="loadGames">LOAD WEEK'S GAMES</button>
-<p class="status" id="scheduleStatus">Choose a week and load the matchups.</p>
-<label for="matchup">Scheduled matchup</label>
-<select id="matchup"><option value="">Load the week's games first</option></select>
-<label for="side">Team you bet / want to price</label>
-<select id="side" disabled><option value="">Choose a matchup first</option></select>
-<div class="notice">Selecting a matchup and team automatically fills the game name and opposing team below. The scheduled-game list is loaded from ESPN's public scoreboard service; it is not a sportsbook odds feed.</div>
-</section>
+
 
 <section class="card">
 <h2>Enter original bet</h2>
@@ -176,7 +178,7 @@ function render(){
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
-$("matchup").addEventListener("change",fillTeams);
+$("matchup").addEventListener("change",()=>{fillTeams();renderOdds();});
 $("side").addEventListener("change",fillOpponent);
 $("calcButton").addEventListener("click",calculate);
 
@@ -206,26 +208,23 @@ function teamAliases(name){
 }
 function renderOdds(){
  const q=$("oddsSearch").value.trim().toLowerCase();
- const weekNum=$("week").value,seasonNum=$("season").value;
- const selectedGames=(scheduleEvents||[]).filter(g=>{
-  const d=g.date?new Date(g.date):null;
-  return d&&d.getFullYear()===Number(seasonNum);
- });
- // The scheduleEvents list was fetched using the selected NFL season/week.
- const selected=selectedGames.length?selectedGames:scheduleEvents||[];
+ const idx=$("matchup").value;
+ const chosen=(idx!==""?(scheduleEvents||[])[Number(idx)]:null);
+ const el=$("oddsBoard");
+ if(!chosen){
+  el.innerHTML='<p class="muted">Select a week, load that week\'s games, then choose one matchup above to see its odds.</p>';
+  return;
+ }
+ const away=teamAliases(chosen.away),home=teamAliases(chosen.home);
  const matches=latestOdds.filter(ev=>{
   const fixture=teamKey(ev.fixture),sport=String(ev.sport||"").toLowerCase();
   if(!(/nfl|football/i.test(sport)||/\\bnfl\\b|football/i.test(fixture)))return false;
-  const inWeek=selected.some(g=>{
-   const away=teamAliases(g.away),home=teamAliases(g.home);
-   return away.some(a=>fixture.includes(a))&&home.some(a=>fixture.includes(a));
-  });
+  const correctTeams=away.some(x=>fixture.includes(x))&&home.some(x=>fixture.includes(x));
   const text=[ev.sport,ev.fixture].join(" ").toLowerCase();
-  return inWeek&&(!q||text.includes(q));
+  return correctTeams&&(!q||text.includes(q));
  });
- const el=$("oddsBoard");
  if(!matches.length){
-  el.innerHTML='<p class="muted">No odds currently match the loaded Week '+esc(weekNum)+' ('+esc(seasonNum)+') schedule. Tap LOAD WEEK\'S GAMES, then refresh live odds. Markets for other weeks/sports are hidden.</p>';
+  el.innerHTML='<p class="muted">No odds currently found for '+esc(chosen.away)+' at '+esc(chosen.home)+'. Refresh live odds or confirm the feed includes this matchup.</p>';
   return;
  }
  el.innerHTML=matches.map(ev=>{
