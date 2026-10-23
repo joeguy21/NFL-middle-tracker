@@ -153,21 +153,29 @@ function oddsMapKey(teamName){
  return g ? [teamKey(g.away),teamKey(g.home),teamKey(teamName)].join("|") : "";
 }
 function savedSelectionMap(){try{return JSON.parse(localStorage.getItem("nflOddsSelectionMap")||"{}")}catch{return {}}}
+function outcomeIds(p){
+ return [p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id,p.competitor_id,p.external_id,p.provider_id,p.selectionId].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);
+}
+function savedTeamForSelection(ev,p){
+ const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
+ if(!g)return "";
+ const map=savedSelectionMap(), base=[teamKey(g.away),teamKey(g.home)], ids=outcomeIds(p);
+ for(const name of [g.away,g.home]){
+  const saved=map[[...base,teamKey(name)].join("|")];
+  if(saved&&ids.includes(String(saved)))return name;
+ }
+ return "";
+}
 function findSelectionPrice(teamName){
- const aliases=teamAliases(teamName);
- const markets=latestOdds.filter(ev=>/money ?line|match winner|winner/i.test(String(ev.market||"")));
- // Prefer an explicitly saved team-to-selection assignment when provider rows use numeric IDs.
+ const aliases=teamAliases(teamName),markets=latestOdds.filter(ev=>/money ?line|match winner|winner/i.test(String(ev.market||"")));
  const key=oddsMapKey(teamName), saved=savedSelectionMap()[key];
- if(saved){
-  for(const ev of markets)for(const p of (ev.prices||[])){
-   const ids=[p.selection,p.participantId].filter(Boolean).map(String);
-   if(ids.includes(String(saved)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
-    return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
-  }
+ if(saved)for(const ev of markets)for(const p of (ev.prices||[])){
+  if(outcomeIds(p).includes(String(saved))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
+   return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
  }
  for(const ev of markets)for(const p of (ev.prices||[])){
-  const label=teamKey(p.name||p.selection||p.team||p.outcome||p.label||"");
-  if(label && !/^\\d+$/.test(label) && aliases.some(a=>label===a||label.includes(a)||a.includes(label)) && Number.isFinite(Number(p.american)) && Number(p.american)!==0)
+  const label=teamKey(p.name||"");
+  if(label&&!/^\\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
    return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
  }
  return null;
@@ -307,7 +315,20 @@ function renderOdds(){
  el.innerHTML=matches.map(ev=>{
   const prices=ev.prices||[];
   return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
-   prices.map(p=>'<div class="row"><span>'+esc(p.name||p.selection||p.selection_id||"Selection")+'</span><b>'+american(p.american)+'</b></div>').join("")+
+   prices.map(p=>{
+    let display=p.name||"";
+    if(!display||/^\\d+$/.test(String(display).trim())){
+     display=savedTeamForSelection(ev,p);
+     if(!display){
+      const verified=prices.filter(x=>savedTeamForSelection(ev,x));
+      if(/money ?line|match winner|winner/i.test(String(ev.market||""))&&prices.length===2&&verified.length===1){
+       const known=savedTeamForSelection(ev,verified[0]);
+       display=outcomeIds(p).some(id=>outcomeIds(verified[0]).includes(id))?known:(known===$("team").value?$("opponent").value:$("team").value);
+      }
+     }
+    }
+    return '<div class="row"><span>'+esc(display||"Unmatched selection")+'</span><b>'+american(p.american)+'</b></div>';
+   }).join("")+
    '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
  }).join("");
 }
