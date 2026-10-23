@@ -180,11 +180,25 @@ function findSelectionPrice(teamName){
  // Compare the precise stored selection/participant ID, not every unrelated ID
  // attached to an outcome (which can collide with another market's identifiers).
  if(saved){
-  // Only match the exact saved selection key. Participant/team IDs may be
-  // shared or mapped differently by feed versions and can return the wrong side.
+  // Exact selection match, scoped to this matchup's moneyline.
   for(const ev of markets)for(const p of (ev.prices||[])){
    if(p.selection!==undefined&&String(p.selection)===String(saved)&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
     return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+  }
+ }
+ // If the user previously verified the other team for this same matchup,
+ // infer this side only when a single two-outcome moneyline market has
+ // exactly one matching saved selection. Never reuse the other team's price.
+ const otherTeam=teamName===g.away?g.home:g.away;
+ const otherSaved=savedSelectionMap()[[teamKey(g.away),teamKey(g.home),teamKey(otherTeam)].join("|")];
+ if(otherSaved){
+  for(const ev of markets){
+   const valid=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0&&p.selection!==undefined);
+   if(valid.length!==2)continue;
+   const known=valid.filter(p=>String(p.selection)===String(otherSaved));
+   if(known.length!==1)continue;
+   const candidate=valid.find(p=>String(p.selection)!==String(otherSaved));
+   if(candidate)return {odds:Number(candidate.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
   }
  }
  const aliases=teamAliases(teamName);
