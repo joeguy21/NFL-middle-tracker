@@ -204,15 +204,27 @@ async function refreshOdds(){
   const res=await fetch("/api/odds",{cache:"no-store"});
   const data=await res.json();
   if(!res.ok)throw new Error(data.error||("Odds service error "+res.status));
-  // Accept common FanLine payload wrappers and normalize each market row.
-  const rows=Array.isArray(data)?data:
-    Array.isArray(data.fixtures)?data.fixtures:
-    Array.isArray(data.events)?data.events:
-    Array.isArray(data.board)?data.board:
-    Array.isArray(data.data?.fixtures)?data.data.fixtures:
-    Array.isArray(data.data?.events)?data.data.events:
-    Array.isArray(data.data)?data.data:
-    Array.isArray(data.results)?data.results:[];
+  // Find a market/fixture collection even when FanLine wraps it in nested objects.
+  let rows=null, rowsKey="";
+  const visited=new Set();
+  function findRows(node,path="root",depth=0){
+   if(!node||typeof node!=="object"||visited.has(node)||depth>7)return false;
+   visited.add(node);
+   for(const k of ["fixtures","markets","events","board","results","odds"]){
+    const v=node[k];
+    if(Array.isArray(v)&&v.length){rows=v;rowsKey=path+"."+k;return true}
+   }
+   for(const [k,v] of Object.entries(node)){
+    if(v&&typeof v==="object"&&findRows(v,path+"."+k,depth+1))return true;
+   }
+   return false;
+  }
+  if(Array.isArray(data)&&data.length){rows=data;rowsKey="root array"}else findRows(data);
+  if(!rows){
+   const keys=data&&typeof data==="object"?Object.keys(data).join(", "):typeof data;
+   const nested= data?.data&&typeof data.data==="object"?Object.keys(data.data).join(", "):"none";
+   throw new Error("No market list found. Top-level fields: "+keys+". data fields: "+nested+".");
+  }
   latestOdds=rows.map(ev=>({
    sport:ev.sport||ev.league||ev.sport_name||"",
    fixture:ev.fixture||ev.name||ev.event||ev.matchup||"",
@@ -222,7 +234,7 @@ async function refreshOdds(){
    updated_at:ev.updated_at||ev.last_update||"",
    prices:Array.isArray(ev.prices)?ev.prices:Array.isArray(ev.outcomes)?ev.outcomes:[]
   }));
-  if(!latestOdds.length)throw new Error("FanLine responded, but no market rows were found. Check the /api/odds response shape.");
+  if(!latestOdds.length)throw new Error("FanLine market list was empty at "+rowsKey+".");
   const nflCount=latestOdds.filter(ev=>/nfl|football/i.test(ev.sport||"")).length;
   if(!nflCount)throw new Error("Feed loaded ("+latestOdds.length+" market rows), but no NFL/American-football markets were returned for this plan/board.");
   status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
