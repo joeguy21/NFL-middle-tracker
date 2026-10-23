@@ -169,43 +169,32 @@ function savedTeamForSelection(ev,p){
 function findSelectionPrice(teamName){
  const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
  if(!g)return null;
- const away=teamAliases(g.away),home=teamAliases(g.home);
- const markets=latestOdds.filter(ev=>{
-  const fixture=teamKey(ev.fixture||"");
-  return /money ?line|match winner|winner/i.test(String(ev.market||""))&&
-   away.some(a=>fixture.includes(a))&&home.some(h=>fixture.includes(h));
+ const isML=ev=>/money\\s*line|match winner|winner/i.test(String(ev.market||""));
+ const a=teamAliases(g.away),h=teamAliases(g.home);
+ const matches=latestOdds.filter(ev=>{
+  const fx=teamKey(ev.fixture||"");
+  return isML(ev)&&a.some(x=>fx.includes(x))&&h.some(x=>fx.includes(x));
  });
- const key=oddsMapKey(teamName),saved=savedSelectionMap()[key];
- // A remembered selection is valid only inside the selected game's moneyline.
- // Compare the precise stored selection/participant ID, not every unrelated ID
- // attached to an outcome (which can collide with another market's identifiers).
- if(saved){
-  // Exact selection match, scoped to this matchup's moneyline.
-  for(const ev of markets)for(const p of (ev.prices||[])){
-   if(p.selection!==undefined&&String(p.selection)===String(saved)&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
-    return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
-  }
- }
- // If the user previously verified the other team for this same matchup,
- // infer this side only when a single two-outcome moneyline market has
- // exactly one matching saved selection. Never reuse the other team's price.
- const otherTeam=teamName===g.away?g.home:g.away;
- const otherSaved=savedSelectionMap()[[teamKey(g.away),teamKey(g.home),teamKey(otherTeam)].join("|")];
- if(otherSaved){
-  for(const ev of markets){
-   const valid=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0&&p.selection!==undefined);
-   if(valid.length!==2)continue;
-   const known=valid.filter(p=>String(p.selection)===String(otherSaved));
-   if(known.length!==1)continue;
-   const candidate=valid.find(p=>String(p.selection)!==String(otherSaved));
-   if(candidate)return {odds:Number(candidate.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
-  }
- }
  const aliases=teamAliases(teamName);
- for(const ev of markets)for(const p of (ev.prices||[])){
-  const label=teamKey(p.name||"");
-  if(label&&!/^\\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0)
-   return {odds:Number(p.american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+ // First priority: match an outcome's actual team label. Never reuse a cached
+ // selection mapping if the provider is already giving us team names.
+ for(const ev of matches){
+  const direct=(ev.prices||[]).filter(p=>{
+   const label=teamKey(p.name||"");
+   return label&&!/^\\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&
+    Number.isFinite(Number(p.american))&&Number(p.american)!==0;
+  });
+  if(direct.length===1)return {odds:Number(direct[0].american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+ }
+ // If the provider supplies numeric IDs only, use a previously user-verified
+ // mapping for this exact team + matchup. Do not infer the other outcome.
+ const saved=savedSelectionMap()[oddsMapKey(teamName)];
+ if(saved){
+  for(const ev of matches){
+   const found=(ev.prices||[]).filter(p=>p.selection!==undefined&&String(p.selection)===String(saved)&&
+    Number.isFinite(Number(p.american))&&Number(p.american)!==0);
+   if(found.length===1)return {odds:Number(found[0].american),updated:ev.updated_at||"",fixture:ev.fixture||""};
+  }
  }
  return null;
 }
@@ -273,7 +262,7 @@ $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
 $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();});
-$("side").addEventListener("change",fillOpponent);
+$("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();});
 $("type").addEventListener("change",prefillOriginalMoneyline);
 $("calcButton").addEventListener("click",calculate);
 
@@ -312,6 +301,7 @@ function renderOdds(){
  }
  const away=teamAliases(chosen.away),home=teamAliases(chosen.home);
  const matches=latestOdds.filter(ev=>{
+  if(!/money\\s*line|match winner|winner/i.test(String(ev.market||"")))return false;
   const fixture=teamKey(ev.fixture),sport=String(ev.sport||"").toLowerCase();
   if(!(/nfl|football/i.test(sport)||/\bnfl\b|football/i.test(fixture)))return false;
   const correctTeams=away.some(x=>fixture.includes(x))&&home.some(x=>fixture.includes(x));
