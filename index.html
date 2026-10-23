@@ -41,6 +41,16 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </section>
 
 <section class="card">
+<h2>Live FanDuel odds</h2>
+<p class="muted">Odds from FanLine Wire. Refresh to retrieve the latest available board.</p>
+<div class="row"><span>Feed status</span><b id="oddsStatus">Not loaded</b></div>
+<button class="primary" type="button" id="refreshOdds">REFRESH LIVE ODDS</button>
+<label for="oddsSearch">Filter by team or matchup</label><input id="oddsSearch" placeholder="Search NFL games">
+<div id="oddsBoard"><p class="muted">Tap refresh to load odds.</p></div>
+<div class="notice">This displays FanLine Wire's FanDuel prices. Availability and in-game coverage depend on your FanLine plan and data feed. Confirm prices in your sportsbook before acting.</div>
+</section>
+
+<section class="card">
 <h2>Choose a game</h2>
 <div class="two">
 <div><label for="week">NFL regular-season week</label>
@@ -169,6 +179,52 @@ $("season").addEventListener("change",loadGames);
 $("matchup").addEventListener("change",fillTeams);
 $("side").addEventListener("change",fillOpponent);
 $("calcButton").addEventListener("click",calculate);
+
+let latestOdds=[];
+function american(v){const n=Number(v);return Number.isFinite(n)?(n>0?"+":"")+n:"—"}
+function renderOdds(){
+ const q=$("oddsSearch").value.trim().toLowerCase();
+ const matches=latestOdds.filter(ev=>{
+  const text=[ev.sport,ev.fixture].join(" ").toLowerCase();
+  return (!q||text.includes(q)) && /nfl|football/i.test(ev.sport||"");
+ });
+ const el=$("oddsBoard");
+ if(!matches.length){el.innerHTML='<p class="muted">No NFL odds match. Feed may not currently include NFL markets.</p>';return}
+ el.innerHTML=matches.map(ev=>{
+  const prices=ev.prices||[];
+  return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
+   prices.map(p=>'<div class="row"><span>'+esc(p.name||p.selection||p.selection_id||"Selection")+'</span><b>'+american(p.american)+'</b></div>').join("")+
+   '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
+ }).join("");
+}
+async function refreshOdds(){
+ const status=$("oddsStatus"),board=$("oddsBoard"),btn=$("refreshOdds");
+ btn.disabled=true;status.textContent="Loading…";
+ try{
+  const res=await fetch("/api/odds",{cache:"no-store"});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||("Odds service error "+res.status));
+  // FanLine board may be returned as fixtures/events; normalize only known fields.
+  latestOdds=(data.fixtures||data.events||data.board||[]).map(ev=>({
+   sport:ev.sport||ev.league||"",
+   fixture:ev.fixture||ev.name||ev.event||"",
+   market:ev.market||"",
+   status:ev.status||"",
+   inplay:Boolean(ev.inplay),
+   updated_at:ev.updated_at||"",
+   prices:ev.prices||[]
+  }));
+  if(!Array.isArray(latestOdds)||!latestOdds.length)throw new Error("The feed returned no recognized fixtures. Check FanLine response format/plan.");
+  status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
+  renderOdds();
+ }catch(err){
+  status.textContent="Unavailable";
+  board.innerHTML='<p class="bad">'+esc(err.message||"Odds could not load")+'</p>';
+ }finally{btn.disabled=false}
+}
+$("refreshOdds").addEventListener("click",refreshOdds);
+$("oddsSearch").addEventListener("input",renderOdds);
+
 render();
 loadGames();
 </script>
