@@ -211,6 +211,9 @@ function prefillOriginalMoneyline(){
   note.textContent="Prefilled from matching live moneyline: "+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Verify against the accepted ticket price.";
   $("odds").insertAdjacentElement("afterend",note);
  }else{
+  // Clear the prior side's displayed price so a team switch can never leave
+  // stale odds (e.g. the away price) in the selected team's ticket field.
+  $("odds").value="";
   const note=$("oddsHelp")||document.createElement("p");note.id="oddsHelp";note.className="status";
   const idx=$("matchup").value, chosen=idx!==""?scheduleEvents[Number(idx)]:null;
   const a=chosen?teamAliases(chosen.away):[], h=chosen?teamAliases(chosen.home):[];
