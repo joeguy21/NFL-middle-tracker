@@ -368,11 +368,14 @@ async function refreshOdds(){
     seenObjects.add(node);
     if(Array.isArray(node)){node.forEach(v=>indexParticipants(v,depth+1));return;}
     const nm=node.display_name||node.full_name||node.team_name||node.participant_name||
-      node.short_name||node.abbreviation||
-      ((node.type==="team"||node.kind==="team"||node.participant_type==="team")?node.name:"");
+      node.competitor_name||node.market_participant_name||node.short_name||
+      node.abbreviation||node.team?.display_name||node.team?.name||
+      ((node.type==="team"||node.kind==="team"||node.participant_type==="team"||node.entity_type==="team")?node.name:"");
     const isTeamRecord=Boolean(nm)&&!/^\d+$/.test(String(nm).trim());
     if(isTeamRecord){
-     [node.id,node.participant_id,node.team_id,node.selection_id,node.outcome_id].filter(v=>v!==undefined&&v!==null).forEach(id=>participantById.set(String(id),String(nm)));
+     [node.id,node.participant_id,node.team_id,node.selection_id,node.outcome_id,
+      node.external_id,node.provider_id,node.participant?.id,node.team?.id]
+      .filter(v=>v!==undefined&&v!==null).forEach(id=>participantById.set(String(id),String(nm)));
     }
     Object.values(node).forEach(v=>indexParticipants(v,depth+1));
    }
@@ -381,8 +384,10 @@ async function refreshOdds(){
     const out=normalizeOutcome(p);
     // Some FanLine boards put the selection ID in the name/selection field.
     // Replace numeric display labels with the matching participant name.
-    const keys=[out.selection,out.participantId,p?.id,p?.selection_id,p?.outcome_id,p?.participant_id,p?.team_id]
-     .filter(v=>v!==undefined&&v!==null).map(String);
+    const keys=[out.selection,out.participantId,p?.id,p?.selection_id,p?.outcome_id,
+      p?.participant_id,p?.team_id,p?.competitor_id,p?.participant?.id,p?.team?.id,
+      p?.external_id,p?.provider_id,p?.selection?.id,p?.outcome?.id]
+     .filter(v=>v!==undefined&&v!==null).map(v=>String(v));
     const looksLikeId=/^\\d+$/.test(String(out.name||"").trim());
     if(!out.name||looksLikeId){
      const candidate=keys.map(k=>participantById.get(k)).find(Boolean);
