@@ -331,13 +331,23 @@ async function refreshOdds(){
     Array.isArray(ev.selections)?ev.selections:
     Array.isArray(marketObj?.outcomes)?marketObj.outcomes:[];
    const participants=ev.participants||ev.competitors||ev.teams||[];
-   // Resolve numeric selections only when participant IDs explicitly match.
-   const participantById=new Map();
-   (Array.isArray(participants)?participants:[]).forEach(t=>{
-    if(!t||typeof t!=="object")return;
-    const nm=t.display_name||t.name||t.full_name||t.abbreviation||t.short_name||"";
-    [t.id,t.participant_id,t.team_id,t.selection_id,t.outcome_id].filter(v=>v!==undefined&&v!==null).forEach(id=>participantById.set(String(id),nm));
-   });
+   // FanLine can put participant records at different levels of the market tree.
+   // Build an ID-to-team-name index from explicitly named participant/team objects.
+   const participantById=new Map(), seenObjects=new Set();
+   function indexParticipants(node,depth=0){
+    if(!node||typeof node!=="object"||depth>7||seenObjects.has(node))return;
+    seenObjects.add(node);
+    if(Array.isArray(node)){node.forEach(v=>indexParticipants(v,depth+1));return;}
+    const nm=node.display_name||node.full_name||node.team_name||node.participant_name||
+      node.short_name||node.abbreviation||
+      ((node.type==="team"||node.kind==="team"||node.participant_type==="team")?node.name:"");
+    const isTeamRecord=Boolean(nm)&&!/^\d+$/.test(String(nm).trim());
+    if(isTeamRecord){
+     [node.id,node.participant_id,node.team_id,node.selection_id,node.outcome_id].filter(v=>v!==undefined&&v!==null).forEach(id=>participantById.set(String(id),String(nm)));
+    }
+    Object.values(node).forEach(v=>indexParticipants(v,depth+1));
+   }
+   indexParticipants(ev);
    const normalized=rawPrices.map(p=>{
     const out=normalizeOutcome(p);
     // Some FanLine boards put the selection ID in the name/selection field.
