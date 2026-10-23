@@ -182,14 +182,52 @@ $("calcButton").addEventListener("click",calculate);
 
 let latestOdds=[];
 function american(v){const n=Number(v);return Number.isFinite(n)?(n>0?"+":"")+n:"—"}
+function teamKey(s){
+ return String(s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\\s+/g," ").trim();
+}
+function teamAliases(name){
+ const clean=teamKey(name), words=clean.split(" ");
+ const aliases=[clean,words.slice(-1).join(" ")];
+ // Common market-board team labels.
+ const map={
+  "new england patriots":["patriots"],"new york jets":["jets"],"new york giants":["giants"],
+  "los angeles chargers":["chargers"],"los angeles rams":["rams"],"san francisco 49ers":["49ers","niners"],
+  "tampa bay buccaneers":["buccaneers","bucs"],"green bay packers":["packers"],"kansas city chiefs":["chiefs"],
+  "las vegas raiders":["raiders"],"new orleans saints":["saints"],"buffalo bills":["bills"],
+  "pittsburgh steelers":["steelers"],"cincinnati bengals":["bengals"],"cleveland browns":["browns"],
+  "baltimore ravens":["ravens"],"houston texans":["texans"],"indianapolis colts":["colts"],
+  "jacksonville jaguars":["jaguars","jags"],"tennessee titans":["titans"],"miami dolphins":["dolphins"],
+  "philadelphia eagles":["eagles"],"washington commanders":["commanders"],"dallas cowboys":["cowboys"],
+  "chicago bears":["bears"],"detroit lions":["lions"],"atlanta falcons":["falcons"],
+  "carolina panthers":["panthers"],"minnesota vikings":["vikings"],"denver broncos":["broncos"],
+  "arizona cardinals":["cardinals"],"seattle seahawks":["seahawks"]
+ };
+ return [...new Set([...(map[clean]||[]),...aliases].filter(x=>x.length>=3))];
+}
 function renderOdds(){
  const q=$("oddsSearch").value.trim().toLowerCase();
+ const weekNum=$("week").value,seasonNum=$("season").value;
+ const selectedGames=(scheduleEvents||[]).filter(g=>{
+  const d=g.date?new Date(g.date):null;
+  return d&&d.getFullYear()===Number(seasonNum);
+ });
+ // The scheduleEvents list was fetched using the selected NFL season/week.
+ const selected=selectedGames.length?selectedGames:scheduleEvents||[];
  const matches=latestOdds.filter(ev=>{
+  const fixture=teamKey(ev.fixture),sport=String(ev.sport||"").toLowerCase();
+  if(!(/nfl|football/i.test(sport)||/\\bnfl\\b|football/i.test(fixture)))return false;
+  const inWeek=selected.some(g=>{
+   const away=teamAliases(g.away),home=teamAliases(g.home);
+   return away.some(a=>fixture.includes(a))&&home.some(a=>fixture.includes(a));
+  });
   const text=[ev.sport,ev.fixture].join(" ").toLowerCase();
-  return (!q||text.includes(q)) && /nfl|football/i.test(ev.sport||"");
+  return inWeek&&(!q||text.includes(q));
  });
  const el=$("oddsBoard");
- if(!matches.length){el.innerHTML='<p class="muted">No NFL odds match. Feed may not currently include NFL markets.</p>';return}
+ if(!matches.length){
+  el.innerHTML='<p class="muted">No odds currently match the loaded Week '+esc(weekNum)+' ('+esc(seasonNum)+') schedule. Tap LOAD WEEK\'S GAMES, then refresh live odds. Markets for other weeks/sports are hidden.</p>';
+  return;
+ }
  el.innerHTML=matches.map(ev=>{
   const prices=ev.prices||[];
   return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
