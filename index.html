@@ -78,7 +78,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div><label for="type">Original bet type</label><select id="type"><option value="ML">Moneyline</option><option value="spread" disabled>Spread (coming later)</option></select></div>
 </div>
 <div class="two">
-<div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="+110"></div>
+<div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="Select game/team to load price" autocomplete="off"></div>
 <div><label for="stake">Actual stake ($)</label><input id="stake" type="number" min="0.01" step="0.01" placeholder="Enter your actual amount"></div>
 </div>
 <hr>
@@ -139,6 +139,8 @@ function fillTeams(){
  side.append(new Option(g.away,"away"));side.append(new Option(g.home,"home"));
  $("game").value=g.away+" vs "+g.home;
  $("team").value="";$("opponent").value="";
+ // Never carry a prior matchup price into a newly selected game.
+ $("odds").value="";$("odds").placeholder="Select a team to load its price";$("oddsHelp")?.remove();
 }
 function fillOpponent(){
  const idx=$("matchup").value, s=$("side").value;
@@ -277,7 +279,7 @@ function render(){
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
-$("matchup").addEventListener("change",()=>{fillTeams();renderOdds();});
+$("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();});
 $("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();});
 $("type").addEventListener("change",prefillOriginalMoneyline);
 $("calcButton").addEventListener("click",calculate);
