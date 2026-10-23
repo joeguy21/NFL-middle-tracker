@@ -388,9 +388,15 @@ async function refreshOdds(){
    return null;
   }
   function normalizeOutcome(p){
-   const participant=p.participant||p.competitor||p.team||{};
+   const participant=p.participant||p.competitor||p.team||p.selection?.participant||p.outcome?.participant||{};
+   const selectionObj=p.selection&&typeof p.selection==="object"?p.selection:{};
+   const outcomeObj=p.outcome&&typeof p.outcome==="object"?p.outcome:{};
    const label=p.name||p.selection_name||p.outcome_name||p.team_name||
-    participant.display_name||participant.name||participant.abbreviation||
+    p.participant_name||p.competitor_name||
+    participant.display_name||participant.displayName||participant.full_name||participant.fullName||
+    participant.team_name||participant.teamName||participant.name||participant.abbreviation||
+    selectionObj.name||selectionObj.display_name||selectionObj.displayName||selectionObj.label||
+    outcomeObj.name||outcomeObj.display_name||outcomeObj.displayName||outcomeObj.label||
     (typeof p.selection==="string"?p.selection:"")||
     (typeof p.outcome==="string"?p.outcome:"")||"";
    const rawOdds=p.american??p.american_odds??p.us_odds??p.odds_american??
@@ -420,9 +426,9 @@ async function refreshOdds(){
     if(!node||typeof node!=="object"||depth>7||seenObjects.has(node))return;
     seenObjects.add(node);
     if(Array.isArray(node)){node.forEach(v=>indexParticipants(v,depth+1));return;}
-    const nm=node.display_name||node.full_name||node.team_name||node.participant_name||
-      node.competitor_name||node.market_participant_name||node.short_name||
-      node.abbreviation||node.team?.display_name||node.team?.name||
+    const nm=node.display_name||node.displayName||node.full_name||node.fullName||node.team_name||node.teamName||node.participant_name||
+      node.participantName||node.competitor_name||node.competitorName||node.market_participant_name||node.short_name||
+      node.abbreviation||node.team?.display_name||node.team?.displayName||node.team?.name||
       ((node.type==="team"||node.kind==="team"||node.participant_type==="team"||node.entity_type==="team")?node.name:"");
     const isTeamRecord=Boolean(nm)&&!/^\d+$/.test(String(nm).trim());
     if(isTeamRecord){
