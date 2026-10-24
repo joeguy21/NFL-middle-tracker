@@ -394,49 +394,23 @@ $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEv
 function analyzeSpreadMiddle(){
  const name=$("midOriginalTeam").value.trim()||"Original side";
  const l1=Number($("midOriginalLine").value),s1=Number($("midOriginalStake").value),a1=Number($("midOriginalOdds").value);
- const l2=Number($("midLiveLine").value),a2=Number($("midLiveOdds").value),proposed=Number($("midLiveStake").value);
+ const l2=Number($("midLiveLine").value),a2=Number($("midLiveOdds").value),hedge=Number($("midLiveStake").value);
  const d1=dec(a1),d2=dec(a2),el=$("middleResults");
- if(![l1,s1,a1,l2,a2].every(Number.isFinite)||s1<=0||!d1||!d2){el.innerHTML='<p class="bad">Enter both spread lines, valid American odds, and the original stake.</p>';return}
- // l1 is point adjustment for original team. l2 is adjustment for its opponent.
- // Winning overlap exists when final margin for original team exceeds -l1
- // while opponent's adjusted margin (opponent margin + l2) also wins.
- const lower=-l1,upper=l2;
- const width=upper-lower;
- const hasOverlap=width>0;
- // Generate outcomes at representative integer margins and exact half-point boundaries.
- const payouts=[];
- for(let margin=-60;margin<=60;margin++){
-  const v1=margin+l1,v2=-margin+l2;
-  const settle=(v,line,stake,decOdds)=>{
-   if(Math.abs(v)<1e-9)return 0;
-   return v>0?stake*(decOdds-1):-stake;
-  };
-  const p1=settle(v1,l1,s1,d1);
-  const p2=proposed>0?settle(v2,l2,proposed,d2):0;
-  payouts.push({margin,net:p1+p2});
+ if(![l1,s1,a1,l2,a2].every(Number.isFinite)||s1<=0||!d1||!d2||!Number.isFinite(hedge)||hedge<0){
+  el.innerHTML='<p class="bad">Enter both spread lines, valid American odds, original stake, and a zero-or-greater proposed hedge stake.</p>';return
  }
- const minNet=Math.min(...payouts.map(x=>x.net)),maxNet=Math.max(...payouts.map(x=>x.net));
- let rec="",h="";
- // Aim equal payout on the two sides as a simple downside-balanced hedge suggestion.
- // Stake on opposing bet to offset disparity using return factors; indicate scenario estimates.
- const sideOriginalWin=s1*(d1-1),sideOriginalLoss=-s1;
- const hedgeStake=Math.round((s1+sideOriginalWin)/(d2)*100)/100;
- if(proposed<=0){
-  $("midLiveStake").value=hedgeStake.toFixed(2);
-  rec='<p class="good">Suggested starting opposing stake: <b>'+money(hedgeStake)+'</b> (balanced against the original side loss using opposing decimal odds). Review outcomes below.</p>';
- }else rec='<p>Using proposed opposing stake: <b>'+money(proposed)+'</b>.</p>';
- // payoff at integer margins shows football score margin examples; pushes handled as stake returned (net zero).
- const samples=[-14,-10,-7,-6,-3,0,3,6,7,10,14];
- const rows=samples.map(m=>{
-  const v1=m+l1,v2=-m+l2;
-  const net1=Math.abs(v1)<1e-8?0:v1>0?s1*(d1-1):-s1;
-  const stake2=proposed>0?proposed:hedgeStake;
-  const net2=Math.abs(v2)<1e-8?0:v2>0?stake2*(d2-1):-stake2;
-  return {m,n:net1+net2};
+ const width=l1+l2;
+ const sampleMargins=[-14,-10,-7,-6,-3,0,3,6,7,10,14];
+ const rows=sampleMargins.map(m=>{
+  const r1=m+l1,r2=-m+l2;
+  const p1=Math.abs(r1)<1e-8?0:r1>0?s1*(d1-1):-s1;
+  const p2=Math.abs(r2)<1e-8?0:r2>0?hedge*(d2-1):-hedge;
+  return {m,p1,p2,n:p1+p2,r1,r2};
  });
- const stake2=proposed>0?proposed:hedgeStake;
- const range=rows.map(x=>x.n);
- el.innerHTML=rec+'<div class="result"><div class="row"><span>Overlap window (original-team margin)</span><b>'+ (hasOverlap?(-l1+1)+' to '+(l2-1):"No winning overlap")+'</b></div><div class="row"><span>Spread gap / overlap width</span><b>'+width.toFixed(1)+' pts</b></div><div class="row"><span>Illustrative worst sampled net</span><b class="'+(Math.min(...range)>=0?'good':'bad')+'">'+money(Math.min(...range))+'</b></div><div class="row"><span>Illustrative best sampled net</span><b class="good">'+money(Math.max(...range))+'</b></div><hr><b>Illustrative margin scenarios</b>'+rows.map(x=>'<div class="row"><span>'+name+' wins by '+x.m+'</span><b class="'+(x.n>=0?'good':'bad')+'">'+money(x.n)+'</b></div>').join('')+'</div><p class="muted">Scenario sample only; exact pushes/half-point lines are applied. For quarter-point markets or correlated alternate rules, validate each settlement condition. Stake suggestion is a starting hedge calculation, not an automatic bet or guaranteed result.</p>';
+ const overlap=width>0;
+ const min=Math.min(...rows.map(x=>x.n)),max=Math.max(...rows.map(x=>x.n));
+ const fmt=x=>money(x);
+ el.innerHTML='<div class="result"><div class="row"><span>Potential winning overlap width</span><b>'+width.toFixed(1)+' pts</b></div><div class="row"><span>Winning overlap condition</span><b>'+(overlap?(-l1)+' < margin < '+l2:'None')+'</b></div><div class="row"><span>Original stake</span><b>'+fmt(s1)+'</b></div><div class="row"><span>Proposed hedge stake</span><b>'+fmt(hedge)+'</b></div><div class="row"><span>Worst sampled net</span><b class="'+(min>=0?'good':'bad')+'">'+fmt(min)+'</b></div><div class="row"><span>Best sampled net</span><b class="'+(max>=0?'good':'bad')+'">'+fmt(max)+'</b></div><hr><b>Illustrative final-margin scenarios</b>'+rows.map(x=>'<div class="row"><span>'+name+' margin '+(x.m>0?'+':'')+x.m+'</span><b class="'+(x.n>=0?'good':'bad')+'">'+fmt(x.n)+'</b></div>').join('')+'</div><p class="muted">Sampled margins only, not a full settlement guarantee. A ticket pushes when its adjusted margin is exactly zero; half-point lines have no push. Enter the actual candidate stake and compare outcomes. Confirm ticket rules and current prices.</p>';
 }
 $("calcButton").addEventListener("click",calculate);
 $("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);
