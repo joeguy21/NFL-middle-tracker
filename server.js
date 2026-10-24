@@ -1,53 +1,22 @@
-const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
-
-const PORT = process.env.PORT || 10000;
-const API_KEY = process.env.FANLINE_API_KEY;
-const API_BASE = "https://api.fanlinewire.com";
-const ROOT = __dirname;
-
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("Referrer-Policy", "no-referrer");
-
-  if (url.pathname === "/api/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ ok: true, keyConfigured: Boolean(API_KEY) }));
-  }
-
-  if (url.pathname === "/api/odds") {
-    if (!API_KEY) {
-      res.writeHead(503, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: false, error: "FANLINE_API_KEY is not configured in Render." }));
-    }
-    try {
-      const upstream = await fetch(`${API_BASE}/v1/board.json`, {
-        headers: { "x-api-key": API_KEY, "Accept": "application/json" },
-        signal: AbortSignal.timeout(12000)
-      });
-      const body = await upstream.text();
-      res.writeHead(upstream.status, {
-        "Content-Type": upstream.headers.get("content-type") || "application/json",
-        "Cache-Control": "no-store"
-      });
-      return res.end(body);
-    } catch (err) {
-      res.writeHead(502, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: false, error: "FanLine odds service could not be reached." }));
-    }
-  }
-
-  const requested = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
-  const filePath = path.resolve(ROOT, requested);
-  if (!filePath.startsWith(ROOT + path.sep) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-    res.writeHead(404); return res.end("Not found");
-  }
-  const ext = path.extname(filePath);
-  const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json" };
-  res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
-  fs.createReadStream(filePath).pipe(res);
-});
-
-server.listen(PORT, "0.0.0.0", () => console.log(`NFL tracker listening on ${PORT}`));
+const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
+const {Pool}=require("pg"),PORT=process.env.PORT||10000,API_KEY=process.env.FANLINE_API_KEY,ACCESS=process.env.TRACKER_ACCESS_KEY,DB=process.env.DATABASE_URL,BASE="https://api.fanlinewire.com",ROOT=__dirname;
+const pool=DB?new Pool({connectionString:DB,ssl:process.env.PGSSLMODE==="disable"?false:{rejectUnauthorized:false},max:5}):null;let ready=false;
+const send=(r,s,o)=>{r.writeHead(s,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});r.end(JSON.stringify(o))};
+async function schema(){if(!pool)throw Error("Database not configured");if(ready)return;await pool.query("CREATE TABLE IF NOT EXISTS tracker_records(record_id TEXT PRIMARY KEY,record_type TEXT NOT NULL,game_key TEXT NOT NULL,payload JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");ready=true}
+async function readBody(req){let b="";for await(const x of req){b+=x;if(b.length>500000)throw Error("Body too large")}return JSON.parse(b||"{}")}
+function auth(req){let k=req.headers["x-tracker-key"];return !!ACCESS&&typeof k==="string"&&k.length===ACCESS.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(ACCESS))}
+const server=http.createServer(async(req,res)=>{const u=new URL(req.url,`http://${req.headers.host||"localhost"}`);
+if(u.pathname==="/api/health")return send(res,200,{ok:true,keyConfigured:!!API_KEY,ledgerConfigured:!!pool&&!!ACCESS});
+if(u.pathname.startsWith("/api/ledger")){
+ if(!ACCESS)return send(res,503,{ok:false,error:"TRACKER_ACCESS_KEY must be set in Render."});
+ if(!auth(req))return send(res,401,{ok:false,error:"Ledger access key required or incorrect."});
+ if(!pool)return send(res,503,{ok:false,error:"DATABASE_URL must be configured with persistent PostgreSQL."});
+ try{await schema();
+ if(req.method==="GET"&&u.pathname==="/api/ledger"){let r=await pool.query("SELECT payload FROM tracker_records ORDER BY updated_at");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
+ if(req.method==="POST"&&u.pathname==="/api/ledger/sync"){let data=await readBody(req);if(!Array.isArray(data.records)||data.records.length>2000)return send(res,400,{ok:false,error:"Expected up to 2,000 records."});const c=await pool.connect();try{await c.query("BEGIN");for(const r of data.records){if(!r||r.id==null||!r.game||!r.recordType)continue;await c.query("INSERT INTO tracker_records(record_id,record_type,game_key,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(record_id) DO UPDATE SET record_type=EXCLUDED.record_type,game_key=EXCLUDED.game_key,payload=EXCLUDED.payload,updated_at=NOW()",[String(r.id),String(r.recordType).slice(0,32),String(r.game).toLowerCase().slice(0,300),JSON.stringify(r)])}await c.query("COMMIT")}catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}return send(res,200,{ok:true,synced:data.records.length})}
+ if(req.method==="DELETE"&&u.pathname==="/api/ledger/record"){let id=u.searchParams.get("id");if(!id)return send(res,400,{ok:false,error:"Record ID required"});let r=await pool.query("DELETE FROM tracker_records WHERE record_id=$1",[id]);return send(res,200,{ok:true,deleted:r.rowCount})}
+ return send(res,404,{ok:false,error:"Unknown ledger endpoint"})
+ }catch(e){console.error("ledger:",e.message);return send(res,500,{ok:false,error:"Ledger operation failed; check database and server logs"})}}
+if(u.pathname==="/api/odds"){if(!API_KEY)return send(res,503,{ok:false,error:"FANLINE_API_KEY is not configured in Render."});try{const q=await fetch(BASE+"/v1/board.json",{headers:{"x-api-key":API_KEY,Accept:"application/json"},signal:AbortSignal.timeout(12000)});res.writeHead(q.status,{"Content-Type":q.headers.get("content-type")||"application/json","Cache-Control":"no-store"});return res.end(await q.text())}catch{return send(res,502,{ok:false,error:"FanLine odds service could not be reached."})}}
+const file=path.resolve(ROOT,u.pathname==="/"?"index.html":decodeURIComponent(u.pathname.slice(1)));if(!file.startsWith(ROOT+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);return res.end("Not found")}const ext=path.extname(file),types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json"};res.writeHead(200,{"Content-Type":types[ext]||"application/octet-stream"});fs.createReadStream(file).pipe(res)
+});server.listen(PORT,"0.0.0.0",()=>console.log("NFL tracker on "+PORT));
