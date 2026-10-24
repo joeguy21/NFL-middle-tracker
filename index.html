@@ -105,9 +105,9 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div><label>Original actual stake ($)</label><input id="midOriginalStake" readonly></div>
 </div>
 <div class="two">
-<div><label for="midCandidate">Available opposing FanDuel live spread</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select></div>
-<div><label for="midLiveLine">Opposing spread</label><input id="midLiveLine" readonly placeholder="Auto-filled from selected live line"></div>
-<div><label for="midLiveOdds">Opposing spread odds</label><input id="midLiveOdds" readonly placeholder="Current FanDuel price"></div>
+<div><label for="midCandidate">Available opposing FanDuel spread (current odds)</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select></div>
+<div><label for="midLiveLine">Opposing spread</label><input id="midLiveLine" readonly placeholder="Auto-filled from current line"></div>
+<div><label for="midLiveOdds">Opposing spread odds</label><input id="midLiveOdds" readonly placeholder="Current available price"></div>
 <div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" readonly placeholder="Auto-calculated"></div>
 </div>
 <button class="primary" type="button" id="analyzeMiddle">ANALYZE HEDGE OUTCOMES</button>
@@ -466,10 +466,10 @@ function fillAnalyzerTicket(){
  $("midOriginalStake").value=money(Number(t.s));
  const options=spreadCandidates(t);
  candidates.innerHTML="";
- if(!options.length)candidates.append(new Option("No matched opposing spread in current feed",""));
+ if(!options.length)candidates.append(new Option("No opposing spread found in current feed",""));
  else{
   candidates.append(new Option("Choose current opposing spread…",""));
-  options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds+(x.live?" · LIVE":""),String(i))));
+  options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds,String(i))));
  }
  candidates.dataset.options=JSON.stringify(options);
  if(options.length){candidates.value="0";selectAnalyzerCandidate()}
