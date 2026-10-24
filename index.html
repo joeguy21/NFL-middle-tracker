@@ -446,7 +446,8 @@ function fillAnalyzerTicket(){
   options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds+(x.live?" · LIVE":""),String(i))));
  }
  candidates.dataset.options=JSON.stringify(options);
- $("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value="";
+ if(options.length){candidates.value="0";selectAnalyzerCandidate()}
+ else{$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value=""}
  $("middleResults").innerHTML=options.length?"":'<p class="muted">No clearly matched opposing spread was found. Refresh the odds feed. This can happen if the feed has no current spread market or does not identify the opposing selection clearly.</p>';
 }
 function selectAnalyzerCandidate(){
