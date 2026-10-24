@@ -364,19 +364,25 @@ function renderOdds(){
   return;
  }
  el.innerHTML=matches.map(ev=>{
-  const prices=ev.prices||[];
-  return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
-   prices.map(p=>{
-    let display=p.name||"";
-    // Numeric provider selection IDs are not team labels.
-    if(!display||/^\d+$/.test(String(display).trim()))display=savedTeamForSelection(ev,p);
-    const unresolved=!display||/^\d+$/.test(String(display).trim());
-    const id=outcomeIds(p)[0]||"";
-    const gameIdx=$("matchup").value, gameObj=gameIdx!==""?scheduleEvents[Number(gameIdx)]:null;
-    const isMoney=/money ?line|match winner|winner/i.test(String(ev.market||""));
-    const assignControls='';
-    return '<div class="row"><span>'+esc(display||"Unmatched selection")+'</span><b>'+american(p.american)+'</b></div>'+assignControls;
-   }).join("")+
+  const prices=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0);
+  const named=prices.map(p=>({p,team:savedTeamForSelection(ev,p)||(()=>{const label=teamKey(p.name||"");for(const t of [chosen.away,chosen.home])if(label&&teamAliases(t).some(a=>label===a||label.includes(a)||a.includes(label)))return t;return ""})()}));
+  // For this exact two-way moneyline only: if the provider returns two
+  // unlabeled outcomes, consistently apply the feed's documented away/home order.
+  const allTwoWay=prices.length===2;
+  const hasOneKnown=allTwoWay&&named.filter(x=>x.team).length===1;
+  const hasNoNames=allTwoWay&&named.every(x=>!x.team);
+  if(allTwoWay&&(hasOneKnown||hasNoNames)){
+   let peer=0;
+   named.forEach(x=>{
+    if(!x.team){
+     x.team=hasOneKnown?([chosen.away,chosen.home].find(t=>teamKey(t)!==teamKey(named.find(y=>y.team)?.team))||"Opponent"):[chosen.away,chosen.home][peer];
+     if(hasNoNames)peer++;
+    }
+   });
+  }
+  return '<div class="result"><b>'+esc(ev.fixture||chosen.away+" at "+chosen.home)+'</b><p class="muted">'+esc(ev.market||"Moneyline")+' · '+(ev.inplay?"LIVE":"Pre-game")+'</p>'+
+   named.map(x=>'<div class="row"><span>'+esc(x.team||"Selection not matched")+'</span><b>'+american(x.p.american)+'</b></div>').join("")+
+   (!allTwoWay?'<p class="muted">Outcome labels are incomplete; prices shown without guessed team assignment.</p>':'')+
    '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
  }).join("");
 }
