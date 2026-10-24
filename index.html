@@ -549,17 +549,31 @@ function analyzeSpreadMiddle(){
  if(!t||!opt||!Number.isFinite(opt.point)||!Number.isFinite(h)||h<=0){el.innerHTML='<p class="bad">Choose a saved original moneyline, a matched opposing spread, and enter a proposed hedge stake above $0.</p>';return}
  const d1=dec(t.a),d2=dec(opt.odds),s1=Number(t.s),line=Number(opt.point);
  if(!d1||!d2){el.innerHTML='<p class="bad">Invalid odds in the selected record or market.</p>';return}
- // Illustrative final margins from original underdog's perspective.
- const margins=[-21,-14,-10,-7,-3,0,3,7,10,14,21];
- const outcomes=margins.map(m=>{
+ // Show only the three requested outcome buckets, from the original
+ // underdog's perspective. Evaluate integer final margins (football scores).
+ const buckets={
+  spread:{title:"1. Opposing spread wins · moneyline loses",values:[]},
+  middle:{title:"2. Middle hits · both bets win",values:[]},
+  ml:{title:"3. Original moneyline wins · spread loses",values:[]}
+ };
+ for(let m=-60;m<=60;m++){
   const originalWin=m>0, hedgeAdj=-m+line, hedgeWin=hedgeAdj>0, hedgePush=Math.abs(hedgeAdj)<1e-8;
   const p1=originalWin?s1*(d1-1):-s1;
   const p2=hedgePush?0:hedgeWin?h*(d2-1):-h;
-  return {m,p1,p2,net:p1+p2,originalWin,hedgeWin,hedgePush};
- });
- const min=Math.min(...outcomes.map(x=>x.net)),max=Math.max(...outcomes.map(x=>x.net));
+  const outcome={m,net:p1+p2};
+  if(!originalWin&&hedgeWin)buckets.spread.values.push(outcome);
+  else if(originalWin&&hedgeWin)buckets.middle.values.push(outcome);
+  else if(originalWin&&!hedgeWin&&!hedgePush)buckets.ml.values.push(outcome);
+ }
  const label=n=>money(n);
- el.innerHTML='<div class="result"><b>'+esc(t.game)+'</b><p>'+esc(t.team)+' moneyline '+(t.a>0?"+":"")+t.a+' · original stake '+label(s1)+'</p><p>Hedge: '+esc(t.opp)+' '+(line>0?"+":"")+line+' @ '+(opt.odds>0?"+":"")+opt.odds+' · proposed '+label(h)+'</p><p class="muted">Feed: '+esc(opt.market)+' · '+(opt.live?"marked LIVE":"live status not confirmed")+(opt.updated?" · updated "+esc(opt.updated):"")+'</p><hr><div class="row"><span>Combined total stakes</span><b>'+label(s1+h)+'</b></div><div class="row"><span>Worst illustrative net</span><b class="'+(min>=0?'good':'bad')+'">'+label(min)+'</b></div><div class="row"><span>Best illustrative net</span><b class="'+(max>=0?'good':'bad')+'">'+label(max)+'</b></div><hr><b>Final margin scenarios (original underdog perspective)</b>'+outcomes.map(x=>'<div class="row"><span>'+esc(t.team)+' '+(x.m>0?"+":"")+x.m+' · '+(x.originalWin?'ML wins':'ML loses')+' / '+(x.hedgePush?'spread pushes':x.hedgeWin?'spread wins':'spread loses')+'</span><b class="'+(x.net>=0?'good':'bad')+'">'+label(x.net)+'</b></div>').join("")+'</div><p class="muted">Illustrations are not exhaustive or probability-weighted. Original moneyline wins only if the underdog wins; the spread can win, lose, or push at different margins. The auto stake equalizes the two reference outcomes (underdog wins vs opponent covers); it does not protect the margin range where the opponent wins outright but fails to cover. This is not a locked-profit calculation or a recommendation to place the hedge.</p>';
+ const displayBucket=(bucket)=>{
+  if(!bucket.values.length)return '<div class="row"><span>'+esc(bucket.title)+'</span><b class="muted">Not applicable for this spread</b></div>';
+  const net=bucket.values[0].net;
+  return '<div class="row"><span>'+esc(bucket.title)+'</span><b class="'+(net>=0?'good':'bad')+'">'+label(net)+'</b></div>';
+ };
+ const vals=Object.values(buckets).flatMap(b=>b.values.map(x=>x.net));
+ const min=vals.length?Math.min(...vals):0,max=vals.length?Math.max(...vals):0;
+ el.innerHTML='<div class="result"><b>'+esc(t.game)+'</b><p>'+esc(t.team)+' moneyline '+(t.a>0?"+":"")+t.a+' · original stake '+label(s1)+'</p><p>Hedge: '+esc(t.opp)+' '+(line>0?"+":"")+line+' @ '+(opt.odds>0?"+":"")+opt.odds+' · proposed '+label(h)+'</p><p class="muted">Feed: '+esc(opt.market)+' · '+(opt.live?"marked LIVE":"live status not confirmed")+(opt.updated?" · updated "+esc(opt.updated):"")+'</p><hr><div class="row"><span>Combined total stakes</span><b>'+label(s1+h)+'</b></div><div class="row"><span>Worst illustrative net</span><b class="'+(min>=0?'good':'bad')+'">'+label(min)+'</b></div><div class="row"><span>Best illustrative net</span><b class="'+(max>=0?'good':'bad')+'">'+label(max)+'</b></div><hr><b>Three hedge outcomes</b>'+displayBucket(buckets.spread)+displayBucket(buckets.middle)+displayBucket(buckets.ml)+'</div><p class="muted">Illustrative net results assume the original moneyline and opposing spread are both settled at the entered odds and stakes. Final score margins are whole numbers; exact spread pushes are not included in these three buckets. A middle hits when both bets win. These are not probability-weighted or a locked-profit guarantee.</p>';
 }
 
 $("calcButton").addEventListener("click",calculate);
