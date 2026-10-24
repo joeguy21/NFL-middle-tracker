@@ -240,6 +240,21 @@ function findSelectionPrice(teamName){
   const matched=matches.flatMap(ev=>(ev.prices||[]).filter(p=>outcomeIds(p).some(id=>spreadIds.has(id))&&Number.isFinite(Number(p.american))&&Number(p.american)!==0).map(p=>({p,ev})));
   if(matched.length===1)return {odds:Number(matched[0].p.american),updated:matched[0].ev.updated_at||"",fixture:matched[0].ev.fixture||"",mappedBy:"shared selection ID"};
  }
+ // The current FanLine NFL moneyline pair is unlabeled and is ordered
+ // home first, away second (verified against the displayed matchup prices).
+ // Only use this fallback for an exact two-outcome market with no labels.
+ for(const ev of matches){
+  const prices=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0);
+  const labels=prices.map(p=>teamKey(p.name||""));
+  if(prices.length===2&&labels.every(label=>!label||/^\\d+$/.test(label))){
+   const selectedAway=teamAliases(g.away).some(a=>aliases.includes(a));
+   const selectedHome=teamAliases(g.home).some(a=>aliases.includes(a));
+   if(selectedAway||selectedHome){
+    const priceIndex=selectedAway?1:0;
+    return {odds:Number(prices[priceIndex].american),updated:ev.updated_at||"",fixture:ev.fixture||"",inferred:true};
+   }
+  }
+ }
  // Last fallback: use an explicitly user-verified selection map for this team.
  const saved=savedSelectionMap()[oddsMapKey(teamName)];
  if(saved){
@@ -288,7 +303,7 @@ function prefillOpposingMoneyline(){
     // order that the original-bet prefill already uses.
     const awaySelected=chosen===teamKey(g.away), homeSelected=chosen===teamKey(g.home);
     if(awaySelected||homeSelected){
-     const opposingIndex=teamKey(opposing)===teamKey(g.away)?0:1;
+     const opposingIndex=teamKey(opposing)===teamKey(g.away)?1:0;
      oi=opposingIndex;
     }
    }
