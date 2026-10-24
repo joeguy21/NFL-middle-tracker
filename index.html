@@ -105,7 +105,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div><label>Original actual stake ($)</label><input id="midOriginalStake" readonly></div>
 </div>
 <div class="two">
-<div><label for="midCandidate">Available opposing FanDuel spread (current odds)</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select></div>
+<div><label for="midCandidate">Available opposing FanDuel spread (current odds)</label><div class="row"><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select><button type="button" id="refreshAnalyzerOdds">REFRESH SPREADS</button></div></div>
 <div><label for="midLiveLine">Opposing spread</label><input id="midLiveLine" readonly placeholder="Auto-filled from current line"></div>
 <div><label for="midLiveOdds">Opposing spread odds</label><input id="midLiveOdds" readonly placeholder="Current available price"></div>
 <div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" readonly placeholder="Auto-calculated"></div>
@@ -400,31 +400,56 @@ $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOppos
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 function spreadCandidates(ticket){
  if(!ticket)return [];
- const teams=[ticket.team,ticket.opp],aliases=Object.fromEntries(teams.map(n=>[teamKey(n),teamAliases(n).map(teamKey)]));
+ const teams=[ticket.team,ticket.opp];
+ const aliases=Object.fromEntries(teams.map(n=>[teamKey(n),teamAliases(n).map(teamKey)]));
  const fixtureMatch=ev=>{const fx=teamKey(ev.fixture||"");return teams.every(n=>aliases[teamKey(n)].some(a=>fx.includes(a)));};
- const spreadMarket=ev=>/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""));
+ const isML=ev=>/money\s*line|match winner|winner/i.test(String(ev.market||""));
+ const isSpread=ev=>/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""));
  const map=savedSelectionMap(),idTeams={};
- // Mapping keys are saved as away|home|team. Match the final team component
- // independently of matchup text/order so saved IDs remain usable.
+ // First use explicit saved team/selection bindings.
  for(const [key,id] of Object.entries(map)){
   const parts=String(key).split("|"),teamPart=teamKey(parts[parts.length-1]||"");
   for(const team of teams)if(aliases[teamKey(team)].includes(teamPart)||teamKey(team)===teamPart)idTeams[String(id)]=team;
  }
- const found=[];
- for(const ev of latestOdds){
-  if(!spreadMarket(ev)||!fixtureMatch(ev))continue;
-  for(const p of ev.prices||[]){
-   const label=teamKey(p.name||"");let selectedTeam="";
-   if(label&&!/^\d+$/.test(label)){
-    for(const team of teams)if(aliases[teamKey(team)].some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "))){selectedTeam=team;break;}
+ const gameMarkets=latestOdds.filter(ev=>fixtureMatch(ev));
+ // Build ID/team pairing from a two-outcome moneyline record. The feed's paired
+ // outcomes are used consistently across markets (selection IDs are shared).
+ for(const ev of gameMarkets.filter(isML)){
+  const pair=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0);
+  if(pair.length!==2)continue;
+  const fixture=String(ev.fixture||"");
+  const halves=fixture.split(/\s+(?:at|vs\.?|@)\s+/i);
+  const ordered=halves.length===2?halves:[];
+  const getLabelTeam=p=>{
+   const label=teamKey(p.name||"");
+   for(const team of teams)if(label&&aliases[teamKey(team)].some(x=>label===x||label.startsWith(x+" ")||label.endsWith(" "+x)||label.includes(" "+x+" ")))return team;
+   return "";
+  };
+  const known=pair.map(getLabelTeam);
+  if(known[0]&&known[1]&&teamKey(known[0])!==teamKey(known[1])){
+   pair.forEach((p,i)=>outcomeIds(p).forEach(id=>idTeams[id]=known[i]));
+  }else if(ordered.length===2){
+   // Only infer unlabeled IDs when exactly two outcomes are present and fixture
+   // names explicitly establish away/home order.
+   const away=teams.find(t=>aliases[teamKey(t)].some(x=>teamKey(ordered[0]).includes(x)));
+   const home=teams.find(t=>aliases[teamKey(t)].some(x=>teamKey(ordered[1]).includes(x)));
+   if(away&&home&&teamKey(away)!==teamKey(home)){
+    pair.forEach((p,i)=>outcomeIds(p).forEach(id=>idTeams[id]=i===0?away:home));
    }
-   const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id,p.competitor_id].filter(v=>v!=null&&String(v)!=="").map(String);
-   if(!selectedTeam)selectedTeam=ids.map(id=>idTeams[id]).find(Boolean)||"";
-   if(teamKey(selectedTeam)!==teamKey(ticket.opp))continue;
+  }
+ }
+ const found=[];
+ for(const ev of gameMarkets.filter(isSpread)){
+  for(const p of ev.prices||[]){
+   const label=teamKey(p.name||"");let team="";
+   for(const candidate of teams)if(label&&!/^\d+$/.test(label)&&aliases[teamKey(candidate)].some(x=>label===x||label.startsWith(x+" ")||label.endsWith(" "+x)||label.includes(" "+x+" "))){team=candidate;break;}
+   const ids=outcomeIds(p);
+   if(!team)team=ids.map(id=>idTeams[id]).find(Boolean)||"";
+   if(teamKey(team)!==teamKey(ticket.opp))continue;
    let point=p.point!=null&&p.point!==""?Number(p.point):NaN;
    if(!Number.isFinite(point)){
-    const text=String(p.name||"")+" "+String(p.selection||"");
-    const m=text.match(/[([]\s*([+-]\d+(?:\.\d+)?)\s*[)]]|(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/);
+    const txt=String(p.name||"")+" "+String(p.selection||"");
+    const m=txt.match(/[([]\s*([+-]\d+(?:\.\d+)?)\s*[)]]|(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/);
     if(m)point=Number(m[1]||m[2]);
    }
    const odds=Number(p.american);if(!Number.isFinite(odds)||odds===0)continue;
@@ -718,6 +743,8 @@ async function refreshOdds(){
  }finally{btn.disabled=false}
 }
 $("refreshOdds").addEventListener("click",refreshOdds);
+$("refreshAnalyzerOdds").addEventListener("click",async()=>{await refreshOdds();fillAnalyzerTicket();});
+$("midTicket").addEventListener("change",fillAnalyzerTicket);
 $("oddsSearch").addEventListener("input",renderOdds);
 
 render();
