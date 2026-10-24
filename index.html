@@ -209,6 +209,25 @@ function findSelectionPrice(teamName){
    .filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0)
    .map(p=>({p,ev})));
  if(validPair.length===2){
+  // Provider sometimes supplies one team name and one opaque selection ID.
+  // When exactly one outcome is team-labeled, safely pair its sole peer to
+  // the opposing team for this exact two-outcome moneyline.
+  const identify=item=>{
+   const label=teamKey(item.p.name||"");
+   if(!label||/^\\d+$/.test(label))return "";
+   for(const candidate of [g.away,g.home]){
+    if(teamAliases(candidate).some(alias=>label===alias||label.includes(alias)||alias.includes(label)))return candidate;
+   }
+   return "";
+  };
+  const labeled=validPair.map(item=>({item,team:identify(item)})).filter(x=>x.team);
+  if(labeled.length===1){
+   const known=labeled[0],peer=validPair.find(item=>item!==known.item);
+   if(teamKey(teamName)===teamKey(known.team))return {odds:Number(known.item.p.american),updated:known.item.ev.updated_at||"",fixture:known.item.ev.fixture||""};
+   if(peer)return {odds:Number(peer.p.american),updated:peer.ev.updated_at||"",fixture:peer.ev.fixture||"",inferred:true};
+  }
+ }
+ if(validPair.length===2){
   const isAway=teamKey(teamName)===teamKey(g.away);
   const isHome=teamKey(teamName)===teamKey(g.home);
   if(isAway||isHome){
