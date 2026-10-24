@@ -463,7 +463,13 @@ function fillAnalyzerTicket(){
  candidates.dataset.options=JSON.stringify(options);
  if(options.length){candidates.value="0";selectAnalyzerCandidate()}
  else{$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value=""}
- $("middleResults").innerHTML=options.length?"":'<p class="muted">No clearly matched opposing spread was found. Refresh the odds feed. This can happen if the feed has no current spread market or does not identify the opposing selection clearly.</p>';
+ const gameAliases=[...teamAliases(t.team),...teamAliases(t.opp)].map(teamKey);
+ const spreadRows=latestOdds.filter(ev=>/spread|handicap|point spread|alternate spread/i.test(String(ev.market||"")));
+ const fixtureRows=spreadRows.filter(ev=>{const fx=teamKey(ev.fixture||"");return gameAliases.some(a=>fx.includes(a));});
+ const exactRows=spreadRows.filter(ev=>{const fx=teamKey(ev.fixture||"");return teamAliases(t.team).some(a=>fx.includes(teamKey(a)))&&teamAliases(t.opp).some(a=>fx.includes(teamKey(a)));});
+ const labelSamples=exactRows.slice(0,3).flatMap(ev=>(ev.prices||[]).slice(0,4).map(p=>String(p.name||"(unlabeled)")));
+ const debug="Feed markets: "+latestOdds.length+" · spread markets: "+spreadRows.length+" · fixture-related spreads: "+fixtureRows.length+" · exact matchup spread rows: "+exactRows.length+(labelSamples.length?" · selections: "+labelSamples.join(", "):"");
+ $("middleResults").innerHTML=options.length?"":'<p class="muted">No opposing spread could be matched. '+esc(debug)+'. Refresh odds and check the current board. If spread markets exist but this matchup is missing, the provider may use a different fixture/selection structure.</p>';
 }
 function selectAnalyzerCandidate(){
  const options=JSON.parse($("midCandidate").dataset.options||"[]"),x=options[Number($("midCandidate").value)],t=activeAnalyzerTicket();
