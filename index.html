@@ -416,8 +416,8 @@ function spreadCandidates(ticket){
    const away=teams.find(t=>aliases[teamKey(t)].some(x=>teamKey(ordered[0]).includes(x)));
    const home=teams.find(t=>aliases[teamKey(t)].some(x=>teamKey(ordered[1]).includes(x)));
    if(away&&home&&teamKey(away)!==teamKey(home)){
-    // FanLine's unlabeled paired outcomes are home-first for this feed.
-    pair.forEach((p,i)=>outcomeIds(p).forEach(id=>idTeams[id]=i===0?home:away));
+    // Use the feed's documented away/home ordering for spread outcome IDs.
+    pair.forEach((p,i)=>outcomeIds(p).forEach(id=>idTeams[id]=i===0?away:home));
    }
   }
  }
