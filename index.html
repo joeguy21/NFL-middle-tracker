@@ -63,7 +63,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <button class="primary" type="button" id="refreshOdds">REFRESH LIVE ODDS</button>
 <label for="oddsSearch">Filter by team or matchup</label><input id="oddsSearch" placeholder="Search NFL games">
 <div id="oddsBoard"><p class="muted">Tap refresh to load odds.</p></div>
-<div class="notice">This displays FanLine Wire's FanDuel prices. Availability and in-game coverage depend on your FanLine plan and data feed. Confirm prices in your sportsbook before acting.</div>
+<div class="notice">This displays FanLine Wire's FanDuel prices. If a provider omits team labels, the app may use the two-outcome away/home ordering as a fallback; verify any inferred mapping against the sportsbook before relying on it. Availability and in-game coverage depend on your FanLine plan and data feed.</div>
 </section>
 
 
@@ -201,8 +201,22 @@ function findSelectionPrice(teamName){
   });
   if(direct.length===1)return {odds:Number(direct[0].american),updated:ev.updated_at||"",fixture:ev.fixture||""};
  }
- // If the provider supplies numeric IDs only, use a previously user-verified
- // mapping for this exact team + matchup. Do not infer the other outcome.
+ // If this feed omits team names, it sometimes returns exactly two moneyline
+ // outcomes in matchup order (away, then home). Only use this fallback when
+ // there are exactly two valid prices for the exact fixture. Label the price
+ // as inferred so the user can verify it before recording a ticket.
+ const validPair=matches.flatMap(ev=>(ev.prices||[])
+   .filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0)
+   .map(p=>({p,ev})));
+ if(validPair.length===2){
+  const isAway=teamKey(teamName)===teamKey(g.away);
+  const isHome=teamKey(teamName)===teamKey(g.home);
+  if(isAway||isHome){
+   const item=validPair[isAway?0:1];
+   return {odds:Number(item.p.american),updated:item.ev.updated_at||"",fixture:item.ev.fixture||"",inferred:true};
+  }
+ }
+ // Last fallback: use an explicitly user-verified selection map for this team.
  const saved=savedSelectionMap()[oddsMapKey(teamName)];
  if(saved){
   for(const ev of matches){
@@ -223,7 +237,7 @@ function prefillOriginalMoneyline(){
   $("odds").placeholder="Auto-filled from current feed";
   $("oddsHelp")?.remove();
   const note=document.createElement("p");note.id="oddsHelp";note.className="status good";
-  note.textContent="Prefilled from matching live moneyline: "+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Verify against the accepted ticket price.";
+  note.textContent=(found.inferred?"Prefilled using feed outcome order (away/home); verify team mapping carefully: ":"Prefilled from matching live moneyline: ")+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Verify against the accepted ticket price.";
   $("odds").insertAdjacentElement("afterend",note);
  }else{
   // Clear the prior side's displayed price so a team switch can never leave
@@ -341,10 +355,7 @@ function renderOdds(){
     const id=outcomeIds(p)[0]||"";
     const gameIdx=$("matchup").value, gameObj=gameIdx!==""?scheduleEvents[Number(gameIdx)]:null;
     const isMoney=/money ?line|match winner|winner/i.test(String(ev.market||""));
-    const assignControls=isMoney&&gameObj&&id&&unresolved?
-     '<div class="status">Selection ID '+esc(id)+' — assign only after verifying its team in the sportsbook/feed:</div>'+
-     '<div class="two"><button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.away).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.away)+'</button>'+
-     '<button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.home).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.home)+'</button></div>':'';
+    const assignControls='';
     return '<div class="row"><span>'+esc(display||"Unmatched selection")+'</span><b>'+american(p.american)+'</b></div>'+assignControls;
    }).join("")+
    '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
