@@ -247,31 +247,63 @@ function findSelectionPrice(teamName){
  return null;
 }
 function prefillOpposingMoneyline(){
- const opposing=$("opponent").value.trim();
- const selected=$("team").value.trim();
+ const opposing=$("opponent").value.trim(), selected=$("team").value.trim();
  if($("type").value!=="ML"||!opposing||!selected){
-  $("hedgeOdds").value="";
-  $("hedgeOdds").placeholder="Select game/team to load opposing price";
-  $("hedgeOddsHelp")?.remove();
-  return;
+  $("hedgeOdds").value="";$("hedgeOdds").placeholder="Select game/team to load opposing price";$("hedgeOddsHelp")?.remove();return;
  }
- const found=findSelectionPrice(opposing);
+ // Prefer the opposing side of the exact same two-outcome market pair.
+ // This guarantees we use the counterpart of the selected game's moneyline,
+ // rather than a similarly named event or an unrelated book/market.
+ const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
+ let found=null;
+ if(g){
+  const aliasesA=teamAliases(g.away),aliasesH=teamAliases(g.home);
+  const isML=ev=>/money\s*line|match winner|winner/i.test(String(ev.market||""));
+  const relevant=latestOdds.filter(ev=>{
+   const fx=teamKey(ev.fixture||"");
+   return isML(ev)&&aliasesA.some(a=>fx.includes(a))&&aliasesH.some(a=>fx.includes(a));
+  });
+  for(const ev of relevant){
+   const prices=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0);
+   if(prices.length!==2)continue;
+   const priceTeam=p=>{
+    const label=teamKey(p.name||"");
+    if(!label||/^\d+$/.test(label))return "";
+    for(const t of [g.away,g.home])if(teamAliases(t).some(a=>label===a||label.includes(a)||a.includes(label)))return t;
+    return "";
+   };
+   const teams=prices.map(priceTeam);
+   const chosen=teamKey(selected), oppose=teamKey(opposing);
+   let oi=-1;
+   if(teams[0]&&teams[1]){
+    const si=teams.findIndex(t=>teamKey(t)===chosen);
+    if(si>=0&&teamKey(teams[1-si])===oppose)oi=1-si;
+   }else{
+    // When provider outcomes are unlabeled, only use the known away/home
+    // order that the original-bet prefill already uses.
+    const awaySelected=chosen===teamKey(g.away), homeSelected=chosen===teamKey(g.home);
+    if(awaySelected||homeSelected){
+     const opposingIndex=teamKey(opposing)===teamKey(g.away)?0:1;
+     oi=opposingIndex;
+    }
+   }
+   if(oi>=0){found={odds:Number(prices[oi].american),updated:ev.updated_at||"",inferred:!teams[0]||!teams[1]};break;}
+  }
+ }
+ if(!found)found=findSelectionPrice(opposing);
  if(found){
-  $("hedgeOdds").value=found.odds;
-  $("hedgeOdds").placeholder="Auto-filled opposing moneyline";
-  $("hedgeOddsHelp")?.remove();
+  $("hedgeOdds").value=found.odds;$("hedgeOdds").placeholder="Auto-filled opposing moneyline";$("hedgeOddsHelp")?.remove();
   const note=document.createElement("p");note.id="hedgeOddsHelp";note.className="status good";
-  note.textContent=(found.inferred?"Opposing price inferred from feed away/home order; verify it: ":"Opposing team's current feed price: ")+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Confirm against the sportsbook before betting.";
+  note.textContent=(found.inferred?"Opposing price inferred from the game's two-outcome feed order; verify it: ":"Opposing team's current feed price: ")+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Confirm against sportsbook.";
   $("hedgeOdds").insertAdjacentElement("afterend",note);
  }else{
-  $("hedgeOdds").value="";
-  $("hedgeOdds").placeholder="Opposing moneyline unavailable";
-  $("hedgeOddsHelp")?.remove();
+  $("hedgeOdds").value="";$("hedgeOdds").placeholder="Opposing moneyline unavailable";$("hedgeOddsHelp")?.remove();
   const note=document.createElement("p");note.id="hedgeOddsHelp";note.className="status";
-  note.textContent="No safely matched moneyline found for "+opposing+". Refresh live odds; price left blank rather than risk showing the selected team's odds.";
+  note.textContent="Could not safely match the opposing team's moneyline. Refresh odds; no price was guessed.";
   $("hedgeOdds").insertAdjacentElement("afterend",note);
  }
 }
+
 function prefillOriginalMoneyline(){
  if($("type").value!=="ML")return;
  const team=$("team").value.trim();
@@ -341,6 +373,7 @@ $("season").addEventListener("change",loadGames);
 $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOpposingMoneyline();});
+$("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 $("calcButton").addEventListener("click",calculate);
 
 let latestOdds=[];
