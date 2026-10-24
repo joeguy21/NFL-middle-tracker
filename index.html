@@ -246,6 +246,32 @@ function findSelectionPrice(teamName){
  }
  return null;
 }
+function prefillOpposingMoneyline(){
+ const opposing=$("opponent").value.trim();
+ const selected=$("team").value.trim();
+ if($("type").value!=="ML"||!opposing||!selected){
+  $("hedgeOdds").value="";
+  $("hedgeOdds").placeholder="Select game/team to load opposing price";
+  $("hedgeOddsHelp")?.remove();
+  return;
+ }
+ const found=findSelectionPrice(opposing);
+ if(found){
+  $("hedgeOdds").value=found.odds;
+  $("hedgeOdds").placeholder="Auto-filled opposing moneyline";
+  $("hedgeOddsHelp")?.remove();
+  const note=document.createElement("p");note.id="hedgeOddsHelp";note.className="status good";
+  note.textContent=(found.inferred?"Opposing price inferred from feed away/home order; verify it: ":"Opposing team's current feed price: ")+(found.odds>0?"+":"")+found.odds+(found.updated?" · updated "+found.updated:"")+". Confirm against the sportsbook before betting.";
+  $("hedgeOdds").insertAdjacentElement("afterend",note);
+ }else{
+  $("hedgeOdds").value="";
+  $("hedgeOdds").placeholder="Opposing moneyline unavailable";
+  $("hedgeOddsHelp")?.remove();
+  const note=document.createElement("p");note.id="hedgeOddsHelp";note.className="status";
+  note.textContent="No safely matched moneyline found for "+opposing+". Refresh live odds; price left blank rather than risk showing the selected team's odds.";
+  $("hedgeOdds").insertAdjacentElement("afterend",note);
+ }
+}
 function prefillOriginalMoneyline(){
  if($("type").value!=="ML")return;
  const team=$("team").value.trim();
@@ -312,9 +338,9 @@ function render(){
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
-$("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();});
-$("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();});
-$("type").addEventListener("change",prefillOriginalMoneyline);
+$("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();prefillOpposingMoneyline();});
+$("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();prefillOpposingMoneyline();});
+$("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("calcButton").addEventListener("click",calculate);
 
 let latestOdds=[];
@@ -510,6 +536,7 @@ async function refreshOdds(){
   status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
   renderOdds();
   prefillOriginalMoneyline();
+  prefillOpposingMoneyline();
  }catch(err){
   status.textContent="Unavailable";
   board.innerHTML='<p class="bad">'+esc(err.message||"Odds could not load")+'</p>';
