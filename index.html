@@ -623,7 +623,7 @@ function renderOdds(){
    // Confirmed FanLine board behavior for this matchup: its two unlabeled
    // moneyline prices were emitted in home/away order, not fixture away/home.
    // Apply positional fallback only for an exact two-price, unlabeled market.
-   if(!match&&prices.length===2&&labels.every(x=>x.length===0)){
+   if(prices.length===2&&labels.every(x=>x.length===0)){
     const homeFirstIndex=i===0?1:0;
     match={odds:Number(prices[homeFirstIndex].american)};
    }
