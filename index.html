@@ -76,10 +76,11 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <label for="opponent">Opposing team</label><input id="opponent" placeholder="Auto-filled when a scheduled team is selected">
 <div class="two">
 <div><label for="book">Original sportsbook</label><select id="book"><option>FanDuel</option><option>DraftKings</option><option>Hard Rock Bet</option></select></div>
-<div><label for="type">Original bet type</label><select id="type"><option value="ML">Moneyline</option><option value="spread" disabled>Spread (coming later)</option></select></div>
+<div><label for="type">Original bet type</label><select id="type"><option value="ML">Moneyline</option><option value="spread">Spread</option></select></div>
 </div>
 <div class="two">
-<div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="Select game/team to load price" autocomplete="off"></div>
+<div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="Enter accepted ticket price" autocomplete="off"></div>
+<div id="originalSpreadWrap" style="display:none"><label for="originalSpread">Original spread (as bet)</label><input id="originalSpread" type="number" step="0.5" placeholder="e.g. +3.5"></div>
 <div><label for="stake">Actual stake ($)</label><input id="stake" type="number" min="0.01" step="0.01" placeholder="Enter your actual amount"></div>
 </div>
 <button class="primary" type="button" id="logBetButton">LOG MY BET</button><div id="logBetStatus" aria-live="polite"></div><p class="muted">After placing your wager, tap this to save the team, sportsbook, accepted odds, and actual stake in My tracked games.</p>
@@ -96,19 +97,20 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 
 <section class="card">
 <h2>Spread Middle Analyzer</h2>
-<p class="muted">Evaluate an original underdog spread against a live opposing spread. This tool is separate from your existing original-bet workflow.</p>
+<p class="muted">Evaluate an original underdog spread against a live opposing spread. Choose a saved spread wager to fill its accepted ticket details and search the latest odds feed for the opponent.</p>
 <div class="two">
-<div><label for="midOriginalTeam">Original team</label><input id="midOriginalTeam" placeholder="Underdog"></div>
+<div><label for="midSavedBet">Saved original wager</label><select id="midSavedBet"><option value="">Choose a saved spread bet…</option></select></div>
+<div><label for="midOriginalTeam">Original team</label><input id="midOriginalTeam" placeholder="Underdog" readonly></div>
 <div><label for="midOriginalLine">Original spread (e.g. +3.5)</label><input id="midOriginalLine" type="number" step="0.5" placeholder="+3.5"></div>
 <div><label for="midOriginalStake">Original stake ($)</label><input id="midOriginalStake" type="number" min="0.01" step="0.01" placeholder="100"></div>
 <div><label for="midOriginalOdds">Original odds</label><input id="midOriginalOdds" type="number" placeholder="-110"></div>
 <div><label for="midLiveLine">Opposing live spread (e.g. -7.5)</label><input id="midLiveLine" type="number" step="0.5" placeholder="-7.5"></div>
-<div><label for="midLiveOdds">Opposing live odds</label><input id="midLiveOdds" type="number" placeholder="-110"></div>
+<div><label for="midLiveOdds">Opposing live odds</label><input id="midLiveOdds" type="number" placeholder="-110"></div><div id="midLiveStatus" class="status">Choose a saved spread bet to look for a live opponent market.</div>
 <div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" type="number" min="0" step="0.01" placeholder="Calculate suggestion"></div>
 </div>
 <button class="primary" type="button" id="analyzeMiddle">ANALYZE MIDDLE & HEDGE</button>
 <div id="middleResults" aria-live="polite"></div>
-<div class="notice">Spread lines and prices must be entered from the accepted ticket and a currently available live market. This analyzer does not yet pull spread markets automatically. A middle is not necessarily a guaranteed profit; pushes, overtime, settlement rules and stale quotes matter.</div>
+<div class="notice">Spread lines and prices must be entered from the accepted ticket and a currently available live market. Automatic opposing-market matching requires labeled team outcomes and point values from the feed; when unavailable, fields stay blank for verification. A middle is not necessarily a guaranteed profit; pushes, overtime, settlement rules and stale quotes matter.</div>
 </section>
 <section class="card">
 <h2>My tracked games</h2><div id="games"><p class="muted">No bets recorded yet.</p></div>
@@ -384,15 +386,49 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function render(){
  $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
- el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
+ el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' '+(g.wagerType==="spread"?"spread "+(Number(g.spreadLine)>0?"+":"")+g.spreadLine:"moneyline")+"</p><p class=\"muted\">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
 }
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
 $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();prefillOpposingMoneyline();});
-$("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOpposingMoneyline();});
+$("type").addEventListener("change",()=>{ $("originalSpreadWrap").style.display=$("type").value==="spread"?"block":"none";prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
+function populateMiddleBets(){
+ const sel=$("midSavedBet");if(!sel)return;const old=sel.value;
+ const eligible=bets.filter(b=>b.recordType==="ticket"&&b.wagerType==="spread"&&Number.isFinite(Number(b.spreadLine)));
+ sel.innerHTML='<option value="">Choose a saved spread bet…</option>';
+ eligible.forEach(b=>sel.append(new Option(b.game+" · "+b.team+" "+(b.spreadLine>0?"+":"")+b.spreadLine+" · "+money(b.s),String(b.id))));
+ if(eligible.some(b=>String(b.id)===old))sel.value=old;
+}
+function fillMiddleFromBet(){
+ const bet=bets.find(b=>String(b.id)===$("midSavedBet").value);if(!bet)return;
+ $("midOriginalTeam").value=bet.team;$("midOriginalLine").value=bet.spreadLine;
+ $("midOriginalStake").value=bet.s;$("midOriginalOdds").value=bet.a;
+ // Search live board for the opponent's spread selection, only when both team and spread point can be identified.
+ const oppAliases=teamAliases(bet.opp),gameAliases=teamAliases(bet.team);
+ const candidates=latestOdds.filter(ev=>/spread|point spread|handicap/i.test(String(ev.market||""))&&
+  gameAliases.some(t=>teamKey(ev.fixture).includes(t))&&oppAliases.some(t=>teamKey(ev.fixture).includes(t)));
+ let found=null;
+ for(const ev of candidates){
+  const hits=(ev.prices||[]).filter(p=>{
+   const label=teamKey(p.name||"");
+   const named=oppAliases.some(a=>label===a||label.includes(a)||a.includes(label));
+   const point=Number(p.point);
+   return named&&Number.isFinite(point)&&Number.isFinite(Number(p.american))&&Number(p.american)!==0;
+  });
+  if(hits.length===1){found={point:Number(hits[0].point),odds:Number(hits[0].american),market:ev.market,updated:ev.updated_at};break}
+ }
+ if(found){$("midLiveLine").value=found.point;$("midLiveOdds").value=found.odds;$("midLiveStatus").textContent="Matched live opposing spread: "+found.point+" @ "+found.odds+(found.updated?" · "+found.updated:"");}
+ else{$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStatus").textContent="No unambiguous opposing live spread found in the current feed. Refresh odds and try again; values were not guessed."}
+ updateSuggestedMiddleStake();
+}
+function updateSuggestedMiddleStake(){
+ const st=Number($("midOriginalStake").value),od=Number($("midOriginalOdds").value),liveod=Number($("midLiveOdds").value);
+ const d1=dec(od),d2=dec(liveod);
+ if(st>0&&d1&&d2){const val=Math.round(st*d1/d2*100)/100;$("midLiveStake").value=val;}
+}
 function analyzeSpreadMiddle(){
  const name=$("midOriginalTeam").value.trim()||"Original side";
  const l1=Number($("midOriginalLine").value),s1=Number($("midOriginalStake").value),a1=Number($("midOriginalOdds").value);
@@ -415,15 +451,15 @@ function analyzeSpreadMiddle(){
  el.innerHTML='<div class="result"><div class="row"><span>Potential winning overlap width</span><b>'+width.toFixed(1)+' pts</b></div><div class="row"><span>Winning overlap condition</span><b>'+(overlap?(-l1)+' < margin < '+l2:'None')+'</b></div><div class="row"><span>Original stake</span><b>'+fmt(s1)+'</b></div><div class="row"><span>Proposed hedge stake</span><b>'+fmt(hedge)+'</b></div><div class="row"><span>Worst sampled net</span><b class="'+(min>=0?'good':'bad')+'">'+fmt(min)+'</b></div><div class="row"><span>Best sampled net</span><b class="'+(max>=0?'good':'bad')+'">'+fmt(max)+'</b></div><hr><b>Illustrative final-margin scenarios</b>'+rows.map(x=>'<div class="row"><span>'+name+' margin '+(x.m>0?'+':'')+x.m+'</span><b class="'+(x.n>=0?'good':'bad')+'">'+fmt(x.n)+'</b></div>').join('')+'</div><p class="muted">Sampled margins only, not a full settlement guarantee. A ticket pushes when its adjusted margin is exactly zero; half-point lines have no push. Enter the actual candidate stake and compare outcomes. Confirm ticket rules and current prices.</p>';
 }
 $("calcButton").addEventListener("click",calculate);
-$("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);
+$("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);\n$("midSavedBet").addEventListener("change",fillMiddleFromBet);\n["midOriginalStake","midOriginalOdds","midLiveOdds"].forEach(id=>$(id).addEventListener("input",updateSuggestedMiddleStake));
 $("logBetButton").addEventListener("click",()=>{
  const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
  const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
  const status=$("logBetStatus");
- if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
+ const wagerType=$("type").value,spreadLine=Number($("originalSpread").value);\n if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0||(wagerType==="spread"&&!Number.isFinite(spreadLine))){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
  const duplicate=bets.some(x=>x.recordType==="ticket"&&x.game.toLowerCase()===game.toLowerCase()&&x.team.toLowerCase()===team.toLowerCase()&&x.book===$("book").value&&Number(x.s)===s&&Number(x.a)===a);
  if(duplicate&&!confirm("This exact wager is already logged. Add another copy anyway?"))return;
- bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,id:Date.now(),loggedAt:new Date().toLocaleString()});
+ bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,wagerType,spreadLine:wagerType==="spread"?spreadLine:null,id:Date.now(),loggedAt:new Date().toLocaleString()});
  save();status.innerHTML='<p class="good">Bet logged in My tracked games on this browser.</p>';
 });
 
