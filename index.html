@@ -384,9 +384,16 @@ function reopen(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Re
 function removeGame(id){if(!confirm("Delete this saved browser record?"))return;bets=bets.filter(x=>x.id!==id);localStorage.setItem("nfltracker",JSON.stringify(bets));render()}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
+ populateMiddleBets();
  $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
- el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' '+(g.wagerType==="spread"?"spread "+(Number(g.spreadLine)>0?"+":"")+g.spreadLine:"moneyline")+"</p><p class=\"muted\">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
+ el.innerHTML=bets.map(g=>{
+  if(g.recordType==="ticket"){
+   const kind=g.wagerType==="spread"?"spread "+(Number(g.spreadLine)>0?"+":"")+g.spreadLine:"moneyline";
+   return '<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' '+esc(kind)+'</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>';
+  }
+  return '<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>';
+ }).join('');
 }
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
