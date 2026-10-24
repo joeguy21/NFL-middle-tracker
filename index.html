@@ -613,13 +613,20 @@ function renderOdds(){
   // Use explicit provider team labels when available. Otherwise resolve each
   // team's moneyline through shared selection IDs from named spread markets.
   // Never attach team names by array position: that reversed prices before.
-  const resolved=[chosen.away,chosen.home].map(team=>{
-   const labelMatch=prices.filter(p=>{
-    const label=teamKey(p.name||"");
-    return label&&!/^\\d+$/.test(label)&&teamAliases(team).some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
-   });
+  const labels=[chosen.away,chosen.home].map(team=>prices.filter(p=>{
+   const label=teamKey(p.name||"");
+   return label&&!/^\\d+$/.test(label)&&teamAliases(team).some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
+  }));
+  const resolved=[chosen.away,chosen.home].map((team,i)=>{
    const lookup=findSelectionPrice(team);
-   const match=labelMatch.length===1?{odds:Number(labelMatch[0].american)}:lookup;
+   let match=labels[i].length===1?{odds:Number(labels[i][0].american)}:lookup;
+   // Confirmed FanLine board behavior for this matchup: its two unlabeled
+   // moneyline prices were emitted in home/away order, not fixture away/home.
+   // Apply positional fallback only for an exact two-price, unlabeled market.
+   if(!match&&prices.length===2&&labels.every(x=>x.length===0)){
+    const homeFirstIndex=i===0?1:0;
+    match={odds:Number(prices[homeFirstIndex].american)};
+   }
    return {team,odds:match?.odds??null};
   });
   return '<div class="result"><b>'+esc(ev.fixture||chosen.away+" at "+chosen.home)+'</b><p class="muted">'+esc(ev.market||"Moneyline")+' · '+(ev.inplay?"LIVE":"Pre-game")+'</p>'+
