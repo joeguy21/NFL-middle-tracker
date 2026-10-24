@@ -400,34 +400,43 @@ $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOppos
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 function spreadCandidates(ticket){
  if(!ticket)return [];
- const aliases=teamAliases(ticket.opp).map(teamKey),ownAliases=teamAliases(ticket.team).map(teamKey);
- const containsTeam=(label,list)=>list.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
- const correctFixture=ev=>{const fx=teamKey(ev.fixture||"");return aliases.some(a=>fx.includes(a))&&ownAliases.some(a=>fx.includes(a));};
+ const names=[ticket.team,ticket.opp], aliases=Object.fromEntries(names.map(n=>[teamKey(n),teamAliases(n).map(teamKey)]));
+ const contains=(label,list)=>list.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
+ const matchFixture=ev=>{
+  const fx=teamKey(ev.fixture||"");
+  return aliases[teamKey(ticket.opp)].some(a=>fx.includes(a))&&aliases[teamKey(ticket.team)].some(a=>fx.includes(a));
+ };
+ const isSpread=ev=>/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""));
  const found=[];
  for(const ev of latestOdds){
-  const market=String(ev.market||"");
-  if(!/spread|handicap|point spread|alternate spread/i.test(market)||!correctFixture(ev))continue;
+  if(!isSpread(ev)||!matchFixture(ev))continue;
   for(const p of ev.prices||[]){
-   const label=teamKey(p.name||"");let selectedTeam="";
+   const label=teamKey(p.name||"");
+   let chosen="";
    if(label&&!/^\d+$/.test(label)){
-    if(containsTeam(label,aliases))selectedTeam=ticket.opp;
-    else if(containsTeam(label,ownAliases))selectedTeam=ticket.team;
+    if(contains(label,aliases[teamKey(ticket.opp)]))chosen=ticket.opp;
+    else if(contains(label,aliases[teamKey(ticket.team)]))chosen=ticket.team;
    }
-   if(!selectedTeam){
-    const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id].filter(v=>v!==undefined&&v!==null).map(String);
-    const map=savedSelectionMap(),parts=String(ticket.game||"").split(/\s+(?:at|vs\.?|@)\s+/i),base=[teamKey(parts[0]||""),teamKey(parts[1]||"")];
-    for(const name of [ticket.opp,ticket.team]){const saved=map[[...base,teamKey(name)].join("|")];if(saved&&ids.includes(String(saved))){selectedTeam=name;break;}}
+   // Provider selection IDs can refer to participant/outcome IDs; honor only saved verified mappings.
+   if(!chosen){
+    const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id,p.competitor_id].filter(v=>v!=null).map(String);
+    const map=savedSelectionMap();
+    const sched=String(ticket.game||"").split(/\s+(?:at|vs\.?|@)\s+/i);
+    const mapBase=[teamKey(sched[0]||""),teamKey(sched[1]||"")];
+    for(const name of names){const saved=map[[...mapBase,teamKey(name)].join("|")];if(saved&&ids.includes(String(saved))){chosen=name;break;}}
    }
-   if(teamKey(selectedTeam)!==teamKey(ticket.opp))continue;
-   let point=p.point!==null&&p.point!==undefined&&p.point!==""?Number(p.point):NaN;
+   if(teamKey(chosen)!==teamKey(ticket.opp))continue;
+   let point=p.point!=null&&p.point!==""?Number(p.point):NaN;
+   // Common outcome text formats: "Falcons -3.5", "Atlanta Falcons (+3.5)".
    if(!Number.isFinite(point)){
-    const signed=label.match(/(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/),ml=market.match(/(?:spread|handicap|point spread)\s*[:(]?\s*([+-]?\d+(?:\.\d+)?)/i);
-    if(signed)point=Number(signed[1]);else if(ml)point=Number(ml[1]);
+    const textLabel=String(p.name||"")+" "+String(p.selection||"");
+    const match=textLabel.match(/[([]\s*([+-]\d+(?:\.\d+)?)\s*[)]]|(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/);
+    if(match)point=Number(match[1]||match[2]);
    }
    const odds=Number(p.american);
-   if(!Number.isFinite(point)||!Number.isFinite(odds)||!odds)continue;
-   const key=[ev.fixture,market,label,point,odds].join("|");
-   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
+   if(!Number.isFinite(point)||!Number.isFinite(odds)||odds===0)continue;
+   const key=[ev.fixture,ev.market,label,point,odds].join("|");
+   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market:ev.market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
   }
  }
  return found;
