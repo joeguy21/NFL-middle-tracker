@@ -401,39 +401,28 @@ $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEv
 function spreadCandidates(ticket){
  if(!ticket)return [];
  const aliases=teamAliases(ticket.opp).map(teamKey),ownAliases=teamAliases(ticket.team).map(teamKey);
- const containsTeam=(label,teamAliases)=>teamAliases.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
- const correctFixture=ev=>{
-  const fx=teamKey(ev.fixture||"");
-  return aliases.some(a=>fx.includes(a))&&ownAliases.some(a=>fx.includes(a));
- };
+ const containsTeam=(label,list)=>list.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
+ const correctFixture=ev=>{const fx=teamKey(ev.fixture||"");return aliases.some(a=>fx.includes(a))&&ownAliases.some(a=>fx.includes(a));};
  const found=[];
  for(const ev of latestOdds){
   const market=String(ev.market||"");
-  if(!/spread|handicap|point spread/i.test(market)||!correctFixture(ev))continue;
-  const ps=ev.prices||[];
-  for(const p of ps){
-   const label=teamKey(p.name||"");
-   // Team identity must be grounded in an actual team label or a saved selection mapping.
-   let selectedTeam="";
+  if(!/spread|handicap|point spread|alternate spread/i.test(market)||!correctFixture(ev))continue;
+  for(const p of ev.prices||[]){
+   const label=teamKey(p.name||"");let selectedTeam="";
    if(label&&!/^\d+$/.test(label)){
     if(containsTeam(label,aliases))selectedTeam=ticket.opp;
     else if(containsTeam(label,ownAliases))selectedTeam=ticket.team;
    }
    if(!selectedTeam){
-    const ids=[p.selection,p.participantId].filter(Boolean).map(String);
-    const map=savedSelectionMap();
-    const base=[teamKey(ticket.game.split(" at ")[0]||""),teamKey(ticket.game.split(" at ")[1]||"")];
-    // Map can resolve outcomes when the currently selected game differs from the saved ticket.
-    for(const name of [ticket.opp,ticket.team]){
-     const saved=map[[...base,teamKey(name)].join("|")];
-     if(saved&&ids.includes(String(saved))){selectedTeam=name;break}
-    }
+    const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id].filter(v=>v!==undefined&&v!==null).map(String);
+    const map=savedSelectionMap(),parts=String(ticket.game||"").split(/\s+(?:at|vs\.?|@)\s+/i),base=[teamKey(parts[0]||""),teamKey(parts[1]||"")];
+    for(const name of [ticket.opp,ticket.team]){const saved=map[[...base,teamKey(name)].join("|")];if(saved&&ids.includes(String(saved))){selectedTeam=name;break;}}
    }
    if(teamKey(selectedTeam)!==teamKey(ticket.opp))continue;
-   let point=Number(p.point);
+   let point=p.point!==null&&p.point!==undefined&&p.point!==""?Number(p.point):NaN;
    if(!Number.isFinite(point)){
-    const match=market.match(/(?:spread|handicap)\s*[:(]?\s*([+-]?\d+(?:\.\d+)?)/i);
-    if(match)point=Number(match[1]);
+    const signed=label.match(/(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/),ml=market.match(/(?:spread|handicap|point spread)\s*[:(]?\s*([+-]?\d+(?:\.\d+)?)/i);
+    if(signed)point=Number(signed[1]);else if(ml)point=Number(ml[1]);
    }
    const odds=Number(p.american);
    if(!Number.isFinite(point)||!Number.isFinite(odds)||!odds)continue;
@@ -652,7 +641,7 @@ async function refreshOdds(){
     participantId:String(participant.id??p.participant_id??p.team_id??""),
     american:americanOdds,
     rawOdds:rawOdds,
-    point:p.point??p.points??p.handicap??null
+    point:p.point??p.points??p.handicap??p.spread??p.line??p.outcome?.point??p.outcome?.handicap??p.selection?.point??p.selection?.handicap??null
    };
   }
   latestOdds=rows.map(ev=>{
@@ -700,7 +689,7 @@ async function refreshOdds(){
    return {
     sport:ev.sport||ev.league||ev.sport_name||ev.sport_key||"",
     fixture:ev.fixture||ev.fixture_name||ev.name||ev.event_name||ev.event||ev.matchup||"",
-    market:typeof ev.market==="string"?ev.market:(marketObj?.name||marketObj?.market_name||ev.market_name||ev.market_type||""),
+    market:typeof ev.market==="string"?ev.market:(marketObj?.name||marketObj?.market_name||ev.market_name||ev.market_type||ev.market_key||ev.key||""),
     status:ev.status||"",
     inplay:Boolean(ev.inplay??ev.is_live??ev.live??ev.in_play),
     updated_at:ev.updated_at||ev.last_update||ev.updated||"",
