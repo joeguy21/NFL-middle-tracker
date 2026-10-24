@@ -451,12 +451,15 @@ function analyzeSpreadMiddle(){
  el.innerHTML='<div class="result"><div class="row"><span>Potential winning overlap width</span><b>'+width.toFixed(1)+' pts</b></div><div class="row"><span>Winning overlap condition</span><b>'+(overlap?(-l1)+' < margin < '+l2:'None')+'</b></div><div class="row"><span>Original stake</span><b>'+fmt(s1)+'</b></div><div class="row"><span>Proposed hedge stake</span><b>'+fmt(hedge)+'</b></div><div class="row"><span>Worst sampled net</span><b class="'+(min>=0?'good':'bad')+'">'+fmt(min)+'</b></div><div class="row"><span>Best sampled net</span><b class="'+(max>=0?'good':'bad')+'">'+fmt(max)+'</b></div><hr><b>Illustrative final-margin scenarios</b>'+rows.map(x=>'<div class="row"><span>'+name+' margin '+(x.m>0?'+':'')+x.m+'</span><b class="'+(x.n>=0?'good':'bad')+'">'+fmt(x.n)+'</b></div>').join('')+'</div><p class="muted">Sampled margins only, not a full settlement guarantee. A ticket pushes when its adjusted margin is exactly zero; half-point lines have no push. Enter the actual candidate stake and compare outcomes. Confirm ticket rules and current prices.</p>';
 }
 $("calcButton").addEventListener("click",calculate);
-$("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);\n$("midSavedBet").addEventListener("change",fillMiddleFromBet);\n["midOriginalStake","midOriginalOdds","midLiveOdds"].forEach(id=>$(id).addEventListener("input",updateSuggestedMiddleStake));
+$("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);
+$("midSavedBet").addEventListener("change",fillMiddleFromBet);
+["midOriginalStake","midOriginalOdds","midLiveOdds"].forEach(id=>$(id).addEventListener("input",updateSuggestedMiddleStake));
 $("logBetButton").addEventListener("click",()=>{
  const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
  const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
  const status=$("logBetStatus");
- const wagerType=$("type").value,spreadLine=Number($("originalSpread").value);\n if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0||(wagerType==="spread"&&!Number.isFinite(spreadLine))){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
+ const wagerType=$("type").value,spreadLine=Number($("originalSpread").value);
+ if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0||(wagerType==="spread"&&!Number.isFinite(spreadLine))){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
  const duplicate=bets.some(x=>x.recordType==="ticket"&&x.game.toLowerCase()===game.toLowerCase()&&x.team.toLowerCase()===team.toLowerCase()&&x.book===$("book").value&&Number(x.s)===s&&Number(x.a)===a);
  if(duplicate&&!confirm("This exact wager is already logged. Add another copy anyway?"))return;
  bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,wagerType,spreadLine:wagerType==="spread"?spreadLine:null,id:Date.now(),loggedAt:new Date().toLocaleString()});
