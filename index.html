@@ -49,14 +49,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div class="notice">Selecting a matchup and team automatically fills the game name and opposing team below. The scheduled-game list is loaded from ESPN's public scoreboard service; it is not a sportsbook odds feed.</div>
 </section>
 
-<section class="card">
-<h2>Private cloud ledger</h2>
-<p class="muted">Connect this browser to your protected cloud bet ledger. The access key is stored in this browser only.</p>
-<label for="ledgerKey">Ledger access key</label><input id="ledgerKey" type="password" autocomplete="off" placeholder="Enter your TRACKER_ACCESS_KEY">
-<button class="primary" id="ledgerConnect" type="button">CONNECT / SYNC LEDGER</button>
-<div class="status" id="ledgerStatus" aria-live="polite">Not connected</div>
-<div class="notice">Your ledger uses PostgreSQL on the app backend. Existing records on this browser are retained. Sync combines cloud and local records by ID; deleting a local row does not erase it from the cloud unless the deletion request succeeds.</div>
-</section>
+
 <section class="card">
 <h2>Dashboard</h2>
 <div class="row"><span>Tracked games</span><b id="count">0</b></div>
@@ -128,21 +121,7 @@ let pending=null, scheduleEvents=[];
 const $=id=>document.getElementById(id);
 function dec(a){a=Number(a);if(!a||!Number.isFinite(a))return null;return a>0?1+a/100:1+100/Math.abs(a)}
 function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
-function ledgerKey(){return $("ledgerKey")?.value||localStorage.getItem("nflLedgerKey")||""}
-async function ledgerRequest(path,opts={}){const key=ledgerKey();if(!key)throw Error("Enter your ledger access key.");const res=await fetch(path,{...opts,headers:{"Content-Type":"application/json","x-tracker-key":key,...(opts.headers||{})}});const data=await res.json();if(!res.ok)throw Error(data.error||"Ledger request failed ("+res.status+")");return data}
-async function syncLedger(){
- const status=$("ledgerStatus");status.textContent="Syncing…";
- try{
-  const remote=await ledgerRequest("/api/ledger");
-  const map=new Map(bets.map(x=>[String(x.id),x]));
-  (remote.records||[]).forEach(x=>{if(!map.has(String(x.id)))map.set(String(x.id),x)});
-  bets=Array.from(map.values());localStorage.setItem("nfltracker",JSON.stringify(bets));
-  const saved=await ledgerRequest("/api/ledger/sync",{method:"POST",body:JSON.stringify({records:bets})});
-  status.textContent="Connected · "+bets.length+" records in local view · "+saved.synced+" synced";
-  render();
- }catch(err){status.textContent="Ledger unavailable: "+err.message}
-}
-function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render();if(ledgerKey())syncLedger()}
+function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render()}
 
 function teamsFromEvent(ev){
  const comps=ev.competitions?.[0]?.competitors||[];
@@ -407,8 +386,6 @@ function render(){
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
  el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
 }
-$("ledgerKey").value=localStorage.getItem("nflLedgerKey")||"";
-$("ledgerConnect").addEventListener("click",()=>{localStorage.setItem("nflLedgerKey",$("ledgerKey").value);syncLedger()});
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
 $("season").addEventListener("change",loadGames);
