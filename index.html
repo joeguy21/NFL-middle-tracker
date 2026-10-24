@@ -400,19 +400,45 @@ $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOppos
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 function spreadCandidates(ticket){
  if(!ticket)return [];
- const matchup=teamKey(ticket.game),dog=teamKey(ticket.team),opp=teamKey(ticket.opp);
- const aliases=teamAliases(ticket.opp);
- const gameMatch=ev=>{const fx=teamKey(ev.fixture||"");return aliases.some(a=>fx.includes(a))&&teamAliases(ticket.team).some(a=>fx.includes(a));};
+ const aliases=teamAliases(ticket.opp).map(teamKey),ownAliases=teamAliases(ticket.team).map(teamKey);
+ const containsTeam=(label,teamAliases)=>teamAliases.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
+ const correctFixture=ev=>{
+  const fx=teamKey(ev.fixture||"");
+  return aliases.some(a=>fx.includes(a))&&ownAliases.some(a=>fx.includes(a));
+ };
  const found=[];
  for(const ev of latestOdds){
-  if(!/spread|handicap/i.test(String(ev.market||""))||!gameMatch(ev))continue;
-  for(const p of ev.prices||[]){
+  const market=String(ev.market||"");
+  if(!/spread|handicap|point spread/i.test(market)||!correctFixture(ev))continue;
+  const ps=ev.prices||[];
+  for(const p of ps){
    const label=teamKey(p.name||"");
-   if(!label||/^\d+$/.test(label)||!aliases.some(a=>label===a||label.includes(a)||a.includes(label)))continue;
-   const point=Number(p.point),odds=Number(p.american);
+   // Team identity must be grounded in an actual team label or a saved selection mapping.
+   let selectedTeam="";
+   if(label&&!/^\d+$/.test(label)){
+    if(containsTeam(label,aliases))selectedTeam=ticket.opp;
+    else if(containsTeam(label,ownAliases))selectedTeam=ticket.team;
+   }
+   if(!selectedTeam){
+    const ids=[p.selection,p.participantId].filter(Boolean).map(String);
+    const map=savedSelectionMap();
+    const base=[teamKey(ticket.game.split(" at ")[0]||""),teamKey(ticket.game.split(" at ")[1]||"")];
+    // Map can resolve outcomes when the currently selected game differs from the saved ticket.
+    for(const name of [ticket.opp,ticket.team]){
+     const saved=map[[...base,teamKey(name)].join("|")];
+     if(saved&&ids.includes(String(saved))){selectedTeam=name;break}
+    }
+   }
+   if(teamKey(selectedTeam)!==teamKey(ticket.opp))continue;
+   let point=Number(p.point);
+   if(!Number.isFinite(point)){
+    const match=market.match(/(?:spread|handicap)\s*[:(]?\s*([+-]?\d+(?:\.\d+)?)/i);
+    if(match)point=Number(match[1]);
+   }
+   const odds=Number(p.american);
    if(!Number.isFinite(point)||!Number.isFinite(odds)||!odds)continue;
-   const key=[ev.fixture,ev.market,label,point,odds].join("|");
-   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market:ev.market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
+   const key=[ev.fixture,market,label,point,odds].join("|");
+   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
   }
  }
  return found;
