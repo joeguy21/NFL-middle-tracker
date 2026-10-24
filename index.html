@@ -609,24 +609,21 @@ function renderOdds(){
  }
  el.innerHTML=matches.map(ev=>{
   const prices=(ev.prices||[]).filter(p=>Number.isFinite(Number(p.american))&&Number(p.american)!==0);
-  const named=prices.map(p=>({p,team:savedTeamForSelection(ev,p)||(()=>{const label=teamKey(p.name||"");for(const t of [chosen.away,chosen.home])if(label&&teamAliases(t).some(a=>label===a||label.includes(a)||a.includes(label)))return t;return ""})()}));
-  // For this exact two-way moneyline only: if the provider returns two
-  // unlabeled outcomes, consistently apply the feed's documented away/home order.
-  const allTwoWay=prices.length===2;
-  const hasOneKnown=allTwoWay&&named.filter(x=>x.team).length===1;
-  const hasNoNames=allTwoWay&&named.every(x=>!x.team);
-  if(allTwoWay&&(hasOneKnown||hasNoNames)){
-   let peer=0;
-   named.forEach(x=>{
-    if(!x.team){
-     x.team=hasOneKnown?([chosen.away,chosen.home].find(t=>teamKey(t)!==teamKey(named.find(y=>y.team)?.team))||"Opponent"):[chosen.away,chosen.home][peer];
-     if(hasNoNames)peer++;
-    }
+  // Use explicit provider team labels when available. Otherwise resolve each
+  // team's moneyline through shared selection IDs from named spread markets.
+  // Never attach team names by array position: that reversed prices before.
+  const resolved=[chosen.away,chosen.home].map(team=>{
+   const labelMatch=prices.filter(p=>{
+    const label=teamKey(p.name||"");
+    return label&&!/^\\d+$/.test(label)&&teamAliases(team).some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
    });
-  }
+   const lookup=findSelectionPrice(team);
+   const match=labelMatch.length===1?{odds:Number(labelMatch[0].american)}:lookup;
+   return {team,odds:match?.odds??null};
+  });
   return '<div class="result"><b>'+esc(ev.fixture||chosen.away+" at "+chosen.home)+'</b><p class="muted">'+esc(ev.market||"Moneyline")+' · '+(ev.inplay?"LIVE":"Pre-game")+'</p>'+
-   named.map(x=>'<div class="row"><span>'+esc(x.team||"Selection not matched")+'</span><b>'+american(x.p.american)+'</b></div>').join("")+
-   (!allTwoWay?'<p class="muted">Outcome labels are incomplete; prices shown without guessed team assignment.</p>':'')+
+   resolved.map(x=>'<div class="row"><span>'+esc(x.team)+'</span><b>'+(x.odds!==null?american(x.odds):"Price not matched")+'</b></div>').join("")+
+   '<p class="muted">'+(resolved.every(x=>x.odds!==null)?"Team prices matched by label/selection ID.":"Provider outcome labels or shared selection IDs did not establish both team prices; no order-based guesses shown.")+'</p>'+
    '<p class="muted">Updated '+esc(ev.updated_at||"timestamp unavailable")+'</p></div>';
  }).join("");
 }
