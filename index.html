@@ -400,43 +400,32 @@ $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOppos
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 function spreadCandidates(ticket){
  if(!ticket)return [];
- const names=[ticket.team,ticket.opp], aliases=Object.fromEntries(names.map(n=>[teamKey(n),teamAliases(n).map(teamKey)]));
- const contains=(label,list)=>list.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
- const matchFixture=ev=>{
-  const fx=teamKey(ev.fixture||"");
-  return aliases[teamKey(ticket.opp)].some(a=>fx.includes(a))&&aliases[teamKey(ticket.team)].some(a=>fx.includes(a));
- };
- const isSpread=ev=>/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""));
+ const teams=[ticket.team,ticket.opp],als=Object.fromEntries(teams.map(n=>[teamKey(n),teamAliases(n).map(teamKey)]));
+ const includesTeam=(label,arr)=>arr.some(a=>label===a||label.startsWith(a+" ")||label.endsWith(" "+a)||label.includes(" "+a+" "));
+ const fixtureMatch=ev=>{const fx=teamKey(ev.fixture||"");return teams.every(n=>als[teamKey(n)].some(a=>fx.includes(a)));};
+ const spreadMarket=ev=>/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""));
+ const map=savedSelectionMap(),baseParts=String(ticket.game||"").split(/\s+(?:at|vs\.?|@)\s+/i);
+ const bases=[[teamKey(baseParts[0]||""),teamKey(baseParts[1]||"")],[teamKey(baseParts[1]||""),teamKey(baseParts[0]||"")]];
+ const mapped={};
+ for(const team of teams)for(const base of bases){const id=map[[...base,teamKey(team)].join("|")];if(id)mapped[String(id)]=team;}
  const found=[];
  for(const ev of latestOdds){
-  if(!isSpread(ev)||!matchFixture(ev))continue;
+  if(!spreadMarket(ev)||!fixtureMatch(ev))continue;
   for(const p of ev.prices||[]){
-   const label=teamKey(p.name||"");
-   let chosen="";
-   if(label&&!/^\d+$/.test(label)){
-    if(contains(label,aliases[teamKey(ticket.opp)]))chosen=ticket.opp;
-    else if(contains(label,aliases[teamKey(ticket.team)]))chosen=ticket.team;
-   }
-   // Provider selection IDs can refer to participant/outcome IDs; honor only saved verified mappings.
-   if(!chosen){
-    const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id,p.competitor_id].filter(v=>v!=null).map(String);
-    const map=savedSelectionMap();
-    const sched=String(ticket.game||"").split(/\s+(?:at|vs\.?|@)\s+/i);
-    const mapBase=[teamKey(sched[0]||""),teamKey(sched[1]||"")];
-    for(const name of names){const saved=map[[...mapBase,teamKey(name)].join("|")];if(saved&&ids.includes(String(saved))){chosen=name;break;}}
-   }
-   if(teamKey(chosen)!==teamKey(ticket.opp))continue;
+   const label=teamKey(p.name||"");let selectedTeam="";
+   if(label&&!/^\d+$/.test(label)){for(const team of teams)if(includesTeam(label,als[teamKey(team)])){selectedTeam=team;break;}}
+   const ids=[p.selection,p.participantId,p.id,p.selection_id,p.outcome_id,p.participant_id,p.team_id,p.competitor_id].filter(v=>v!=null&&String(v)!=="").map(String);
+   if(!selectedTeam)selectedTeam=ids.map(id=>mapped[id]).find(Boolean)||"";
+   if(teamKey(selectedTeam)!==teamKey(ticket.opp))continue;
    let point=p.point!=null&&p.point!==""?Number(p.point):NaN;
-   // Common outcome text formats: "Falcons -3.5", "Atlanta Falcons (+3.5)".
    if(!Number.isFinite(point)){
-    const textLabel=String(p.name||"")+" "+String(p.selection||"");
-    const match=textLabel.match(/[([]\s*([+-]\d+(?:\.\d+)?)\s*[)]]|(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/);
-    if(match)point=Number(match[1]||match[2]);
+    const txt=String(p.name||"")+" "+String(p.selection||"");
+    const hit=txt.match(/[([]\s*([+-]\d+(?:\.\d+)?)\s*[)]]|(?:^|\s)([+-]\d+(?:\.\d+)?)(?:\s|$)/);
+    if(hit)point=Number(hit[1]||hit[2]);
    }
-   const odds=Number(p.american);
-   if(!Number.isFinite(point)||!Number.isFinite(odds)||odds===0)continue;
-   const key=[ev.fixture,ev.market,label,point,odds].join("|");
-   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market:ev.market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
+   const odds=Number(p.american);if(!Number.isFinite(odds)||odds===0)continue;
+   const key=[ev.fixture,ev.market,ids.join(","),point,odds].join("|");
+   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market:ev.market,team:ticket.opp,point:Number.isFinite(point)?point:null,odds,updated:ev.updated_at||"",live:ev.inplay});
   }
  }
  return found;
@@ -460,42 +449,40 @@ function fillAnalyzerTicket(){
  const t=activeAnalyzerTicket(),candidates=$("midCandidate");
  if(!t){candidates.innerHTML='<option value="">Select a saved original wager</option>';return}
  $("midOriginalTeam").value=t.team;$("midOppTeam").value=t.opp;
- $("midOriginalOdds").value=(Number(t.a)>0?"+":"")+t.a;
- $("midOriginalStake").value=money(Number(t.s));
- const options=spreadCandidates(t);
- candidates.innerHTML="";
+ $("midOriginalOdds").value=(Number(t.a)>0?"+":"")+t.a;$("midOriginalStake").value=money(Number(t.s));
+ const options=spreadCandidates(t);candidates.innerHTML="";
  if(!options.length)candidates.append(new Option("No opposing spread found in current feed",""));
  else{
   candidates.append(new Option("Choose current opposing spread…",""));
-  options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds,String(i))));
+  options.forEach((x,i)=>{
+   const line=Number.isFinite(x.point)?" "+(x.point>0?"+":"")+x.point:" (handicap unavailable)";
+   candidates.append(new Option(x.team+line+" @ "+(x.odds>0?"+":"")+x.odds,String(i)));
+  });
  }
  candidates.dataset.options=JSON.stringify(options);
  if(options.length){candidates.value="0";selectAnalyzerCandidate()}
- else{$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value=""}
- const gameAliases=[...teamAliases(t.team),...teamAliases(t.opp)].map(teamKey);
- const spreadRows=latestOdds.filter(ev=>/spread|handicap|point spread|alternate spread/i.test(String(ev.market||"")));
- const fixtureRows=spreadRows.filter(ev=>{const fx=teamKey(ev.fixture||"");return gameAliases.some(a=>fx.includes(a));});
- const exactRows=spreadRows.filter(ev=>{const fx=teamKey(ev.fixture||"");return teamAliases(t.team).some(a=>fx.includes(teamKey(a)))&&teamAliases(t.opp).some(a=>fx.includes(teamKey(a)));});
- const labelSamples=exactRows.slice(0,3).flatMap(ev=>(ev.prices||[]).slice(0,4).map(p=>String(p.name||"(unlabeled)")));
- const debug="Feed markets: "+latestOdds.length+" · spread markets: "+spreadRows.length+" · fixture-related spreads: "+fixtureRows.length+" · exact matchup spread rows: "+exactRows.length+(labelSamples.length?" · selections: "+labelSamples.join(", "):"");
- $("middleResults").innerHTML=options.length?"":'<p class="muted">No opposing spread could be matched. '+esc(debug)+'. Refresh odds and check the current board. If spread markets exist but this matchup is missing, the provider may use a different fixture/selection structure.</p>';
+ else{$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value="";}
+ if(options.some(x=>!Number.isFinite(x.point))){
+  $("middleResults").innerHTML='<p class="muted">Live opposing spread price found by matching market selection IDs. The provider feed does not include its handicap points, so hedge outcomes cannot be calculated until the actual spread line is available.</p>';
+ }else if(!options.length){
+  const spreadRows=latestOdds.filter(ev=>/spread|handicap|point spread|alternate spread/i.test(String(ev.market||"")));
+  $("middleResults").innerHTML='<p class="muted">No opposing spread could be matched. Feed markets: '+latestOdds.length+' · spread markets: '+spreadRows.length+'.</p>';
+ }
 }
 function selectAnalyzerCandidate(){
  const options=JSON.parse($("midCandidate").dataset.options||"[]"),x=options[Number($("midCandidate").value)],t=activeAnalyzerTicket();
  if(!x||!t){$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value="";return}
- $("midLiveLine").value=(x.point>0?"+":"")+x.point;
+ $("midLiveLine").value=Number.isFinite(x.point)?(x.point>0?"+":"")+x.point:"";
  $("midLiveOdds").value=(x.odds>0?"+":"")+x.odds;
  const originalDec=dec(t.a),hedgeDec=dec(x.odds),stake=Number(t.s);
- // Equalize two reference cases: original dog wins vs opponent covers its spread.
- // This does NOT neutralize the range where the favorite wins but fails to cover.
- const suggested=originalDec&&hedgeDec&&stake>0?Math.round(stake*originalDec/hedgeDec*100)/100:null;
+ const suggested=Number.isFinite(x.point)&&originalDec&&hedgeDec&&stake>0?Math.round(stake*originalDec/hedgeDec*100)/100:null;
  $("midLiveStake").value=suggested===null?"":suggested.toFixed(2);
+ if(!Number.isFinite(x.point))$("middleResults").innerHTML='<p class="muted">Live spread price is populated, but this feed record omits the handicap. The analyzer needs the actual line before it can calculate outcomes.</p>';
 }
-
 function analyzeSpreadMiddle(){
  const t=activeAnalyzerTicket(),opt=JSON.parse($("midCandidate").dataset.options||"[]")[Number($("midCandidate").value)];
  const h=Number($("midLiveStake").value),el=$("middleResults");
- if(!t||!opt||!Number.isFinite(h)||h<=0){el.innerHTML='<p class="bad">Choose a saved original moneyline, a matched opposing spread, and enter a proposed hedge stake above $0.</p>';return}
+ if(!t||!opt||!Number.isFinite(opt.point)||!Number.isFinite(h)||h<=0){el.innerHTML='<p class="bad">Choose a saved original moneyline, a matched opposing spread, and enter a proposed hedge stake above $0.</p>';return}
  const d1=dec(t.a),d2=dec(opt.odds),s1=Number(t.s),line=Number(opt.point);
  if(!d1||!d2){el.innerHTML='<p class="bad">Invalid odds in the selected record or market.</p>';return}
  // Illustrative final margins from original underdog's perspective.
