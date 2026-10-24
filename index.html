@@ -81,6 +81,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div><label for="odds">Original American odds</label><input id="odds" type="number" placeholder="Select game/team to load price" autocomplete="off"></div>
 <div><label for="stake">Actual stake ($)</label><input id="stake" type="number" min="0.01" step="0.01" placeholder="Enter your actual amount"></div>
 </div>
+<button class="primary" type="button" id="logBetButton">LOG MY BET</button><div id="logBetStatus" aria-live="polite"></div><p class="muted">After placing your wager, tap this to save the team, sportsbook, accepted odds, and actual stake in My tracked games.</p>
 <hr>
 <h2>Potential hedge</h2>
 <div class="two">
@@ -365,7 +366,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function render(){
  $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
- el.innerHTML=bets.map(g=>'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
+ el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
 }
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
@@ -375,6 +376,16 @@ $("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline
 $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
 $("calcButton").addEventListener("click",calculate);
+$("logBetButton").addEventListener("click",()=>{
+ const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
+ const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
+ const status=$("logBetStatus");
+ if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
+ const duplicate=bets.some(x=>x.recordType==="ticket"&&x.game.toLowerCase()===game.toLowerCase()&&x.team.toLowerCase()===team.toLowerCase()&&x.book===$("book").value&&Number(x.s)===s&&Number(x.a)===a);
+ if(duplicate&&!confirm("This exact wager is already logged. Add another copy anyway?"))return;
+ bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,id:Date.now(),loggedAt:new Date().toLocaleString()});
+ save();status.innerHTML='<p class="good">Bet logged in My tracked games on this browser.</p>';
+});
 
 let latestOdds=[];
 function american(v){const n=Number(v);return Number.isFinite(n)?(n>0?"+":"")+n:"—"}
