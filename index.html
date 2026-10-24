@@ -96,19 +96,23 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 
 <section class="card">
 <h2>Spread Middle Analyzer</h2>
-<p class="muted">Evaluate an original underdog spread against a live opposing spread. This tool is separate from your existing original-bet workflow.</p>
+<p class="muted">Your original ticket is an underdog moneyline. Choose a saved wager, then compare available opposing live spread options for that matchup.</p>
+<label for="midTicket">Original moneyline wager</label><select id="midTicket"><option value="">Log an underdog moneyline wager first</option></select>
 <div class="two">
-<div><label for="midOriginalTeam">Original team</label><input id="midOriginalTeam" placeholder="Underdog"></div>
-<div><label for="midOriginalLine">Original spread (e.g. +3.5)</label><input id="midOriginalLine" type="number" step="0.5" placeholder="+3.5"></div>
-<div><label for="midOriginalStake">Original stake ($)</label><input id="midOriginalStake" type="number" min="0.01" step="0.01" placeholder="100"></div>
-<div><label for="midOriginalOdds">Original odds</label><input id="midOriginalOdds" type="number" placeholder="-110"></div>
-<div><label for="midLiveLine">Opposing live spread (e.g. -7.5)</label><input id="midLiveLine" type="number" step="0.5" placeholder="-7.5"></div>
-<div><label for="midLiveOdds">Opposing live odds</label><input id="midLiveOdds" type="number" placeholder="-110"></div>
-<div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" type="number" min="0" step="0.01" placeholder="Calculate suggestion"></div>
+<div><label>Original underdog</label><input id="midOriginalTeam" readonly placeholder="Auto-filled from ticket"></div>
+<div><label>Opposing team</label><input id="midOppTeam" readonly placeholder="Auto-filled from ticket"></div>
+<div><label>Original moneyline odds</label><input id="midOriginalOdds" readonly></div>
+<div><label>Original actual stake ($)</label><input id="midOriginalStake" readonly></div>
 </div>
-<button class="primary" type="button" id="analyzeMiddle">ANALYZE MIDDLE & HEDGE</button>
+<label for="midCandidate">Available opposing FanDuel live spread</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select>
+<div class="two">
+<div><label for="midLiveLine">Selected opposing spread</label><input id="midLiveLine" readonly></div>
+<div><label for="midLiveOdds">Selected spread odds</label><input id="midLiveOdds" readonly></div>
+<div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" type="number" min="0" step="0.01" placeholder="Enter planned hedge"></div>
+</div>
+<button class="primary" type="button" id="analyzeMiddle">ANALYZE MONEYLINE + SPREAD HEDGE</button>
 <div id="middleResults" aria-live="polite"></div>
-<div class="notice">Spread lines and prices must be entered from the accepted ticket and a currently available live market. This analyzer does not yet pull spread markets automatically. A middle is not necessarily a guaranteed profit; pushes, overtime, settlement rules and stale quotes matter.</div>
+<div class="notice">This compares your original underdog moneyline with a selected opposing spread. It is a hedge/scenario analyzer—not a conventional two-spread middle. Results use final-margin illustrations and the displayed spread handicap, not a prediction of the game's finish. Spread data is shown only when the feed supplies a recognizable opposing-team label and handicap; verify current market, score, odds, and ticket settlement before betting.</div>
 </section>
 <section class="card">
 <h2>My tracked games</h2><div id="games"><p class="muted">No bets recorded yet.</p></div>
@@ -382,6 +386,7 @@ function reopen(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Re
 async function removeGame(id){if(!confirm("Delete this saved browser record?"))return;bets=bets.filter(x=>x.id!==id);localStorage.setItem("nfltracker",JSON.stringify(bets));render();if(ledgerKey()){try{await ledgerRequest("/api/ledger/record?id="+encodeURIComponent(String(id)),{method:"DELETE"});$("ledgerStatus").textContent="Deleted record from cloud ledger."}catch(e){$("ledgerStatus").textContent="Removed locally; cloud deletion failed: "+e.message}}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
+ refreshAnalyzerChoices();
  $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
  el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
@@ -393,29 +398,86 @@ $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOrig
 $("side").addEventListener("change",()=>{fillOpponent();prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("type").addEventListener("change",()=>{prefillOriginalMoneyline();prefillOpposingMoneyline();});
 $("team").addEventListener("input",prefillOpposingMoneyline);$("opponent").addEventListener("input",prefillOpposingMoneyline);
-function analyzeSpreadMiddle(){
- const name=$("midOriginalTeam").value.trim()||"Original side";
- const l1=Number($("midOriginalLine").value),s1=Number($("midOriginalStake").value),a1=Number($("midOriginalOdds").value);
- const l2=Number($("midLiveLine").value),a2=Number($("midLiveOdds").value),hedge=Number($("midLiveStake").value);
- const d1=dec(a1),d2=dec(a2),el=$("middleResults");
- if(![l1,s1,a1,l2,a2].every(Number.isFinite)||s1<=0||!d1||!d2||!Number.isFinite(hedge)||hedge<0){
-  el.innerHTML='<p class="bad">Enter both spread lines, valid American odds, original stake, and a zero-or-greater proposed hedge stake.</p>';return
+function spreadCandidates(ticket){
+ if(!ticket)return [];
+ const matchup=teamKey(ticket.game),dog=teamKey(ticket.team),opp=teamKey(ticket.opp);
+ const aliases=teamAliases(ticket.opp);
+ const gameMatch=ev=>{const fx=teamKey(ev.fixture||"");return aliases.some(a=>fx.includes(a))&&teamAliases(ticket.team).some(a=>fx.includes(a));};
+ const found=[];
+ for(const ev of latestOdds){
+  if(!/spread|handicap/i.test(String(ev.market||""))||!gameMatch(ev))continue;
+  for(const p of ev.prices||[]){
+   const label=teamKey(p.name||"");
+   if(!label||/^\d+$/.test(label)||!aliases.some(a=>label===a||label.includes(a)||a.includes(label)))continue;
+   const point=Number(p.point),odds=Number(p.american);
+   if(!Number.isFinite(point)||!Number.isFinite(odds)||!odds)continue;
+   const key=[ev.fixture,ev.market,label,point,odds].join("|");
+   if(!found.some(x=>x.key===key))found.push({key,fixture:ev.fixture,market:ev.market,team:ticket.opp,point,odds,updated:ev.updated_at||"",live:ev.inplay});
+  }
  }
- const width=l1+l2;
- const sampleMargins=[-14,-10,-7,-6,-3,0,3,6,7,10,14];
- const rows=sampleMargins.map(m=>{
-  const r1=m+l1,r2=-m+l2;
-  const p1=Math.abs(r1)<1e-8?0:r1>0?s1*(d1-1):-s1;
-  const p2=Math.abs(r2)<1e-8?0:r2>0?hedge*(d2-1):-hedge;
-  return {m,p1,p2,n:p1+p2,r1,r2};
- });
- const overlap=width>0;
- const min=Math.min(...rows.map(x=>x.n)),max=Math.max(...rows.map(x=>x.n));
- const fmt=x=>money(x);
- el.innerHTML='<div class="result"><div class="row"><span>Potential winning overlap width</span><b>'+width.toFixed(1)+' pts</b></div><div class="row"><span>Winning overlap condition</span><b>'+(overlap?(-l1)+' < margin < '+l2:'None')+'</b></div><div class="row"><span>Original stake</span><b>'+fmt(s1)+'</b></div><div class="row"><span>Proposed hedge stake</span><b>'+fmt(hedge)+'</b></div><div class="row"><span>Worst sampled net</span><b class="'+(min>=0?'good':'bad')+'">'+fmt(min)+'</b></div><div class="row"><span>Best sampled net</span><b class="'+(max>=0?'good':'bad')+'">'+fmt(max)+'</b></div><hr><b>Illustrative final-margin scenarios</b>'+rows.map(x=>'<div class="row"><span>'+name+' margin '+(x.m>0?'+':'')+x.m+'</span><b class="'+(x.n>=0?'good':'bad')+'">'+fmt(x.n)+'</b></div>').join('')+'</div><p class="muted">Sampled margins only, not a full settlement guarantee. A ticket pushes when its adjusted margin is exactly zero; half-point lines have no push. Enter the actual candidate stake and compare outcomes. Confirm ticket rules and current prices.</p>';
+ return found;
 }
+function refreshAnalyzerChoices(){
+ const sel=$("midTicket"),prev=sel.value;
+ const tickets=bets.filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
+ sel.innerHTML='<option value="">Select saved original moneyline…</option>';
+ tickets.forEach((t,i)=>sel.append(new Option(t.game+" · "+t.team+" ML "+(t.a>0?"+":"")+t.a+" · "+money(t.s),String(i))));
+ // Keep a stable identity by using the array index only for this refresh.
+ if(prev!==""&&Number(prev)<tickets.length)sel.value=prev;
+ if(sel.value===""){$("midOriginalTeam").value="";$("midOppTeam").value="";$("midOriginalOdds").value="";$("midOriginalStake").value="";$("midCandidate").innerHTML='<option value="">Select a saved original wager</option>';return}
+ fillAnalyzerTicket();
+}
+function activeAnalyzerTicket(){
+ const tickets=bets.filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
+ const i=Number($("midTicket").value);
+ return $("midTicket").value!==""?tickets[i]||null:null;
+}
+function fillAnalyzerTicket(){
+ const t=activeAnalyzerTicket(),candidates=$("midCandidate");
+ if(!t){candidates.innerHTML='<option value="">Select a saved original wager</option>';return}
+ $("midOriginalTeam").value=t.team;$("midOppTeam").value=t.opp;
+ $("midOriginalOdds").value=(Number(t.a)>0?"+":"")+t.a;
+ $("midOriginalStake").value=money(Number(t.s));
+ const options=spreadCandidates(t);
+ candidates.innerHTML="";
+ if(!options.length)candidates.append(new Option("No clearly matched opposing spread in current feed",""));
+ else{
+  candidates.append(new Option("Choose opposing spread…",""));
+  options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds+(x.live?" · LIVE":""),String(i))));
+ }
+ candidates.dataset.options=JSON.stringify(options);
+ $("midLiveLine").value="";$("midLiveOdds").value="";
+ $("middleResults").innerHTML=options.length?"":'<p class="muted">No unambiguous opposing-team spread was found. Refresh live odds, or wait for spread markets to be available. Do not guess team/line assignments.</p>';
+}
+function selectAnalyzerCandidate(){
+ const options=JSON.parse($("midCandidate").dataset.options||"[]"),x=options[Number($("midCandidate").value)];
+ if(!x){$("midLiveLine").value="";$("midLiveOdds").value="";return}
+ $("midLiveLine").value=(x.point>0?"+":"")+x.point;
+ $("midLiveOdds").value=(x.odds>0?"+":"")+x.odds;
+}
+function analyzeSpreadMiddle(){
+ const t=activeAnalyzerTicket(),opt=JSON.parse($("midCandidate").dataset.options||"[]")[Number($("midCandidate").value)];
+ const h=Number($("midLiveStake").value),el=$("middleResults");
+ if(!t||!opt||!Number.isFinite(h)||h<=0){el.innerHTML='<p class="bad">Choose a saved original moneyline, a matched opposing spread, and enter a proposed hedge stake above $0.</p>';return}
+ const d1=dec(t.a),d2=dec(opt.odds),s1=Number(t.s),line=Number(opt.point);
+ if(!d1||!d2){el.innerHTML='<p class="bad">Invalid odds in the selected record or market.</p>';return}
+ // Illustrative final margins from original underdog's perspective.
+ const margins=[-21,-14,-10,-7,-3,0,3,7,10,14,21];
+ const outcomes=margins.map(m=>{
+  const originalWin=m>0, hedgeAdj=-m+line, hedgeWin=hedgeAdj>0, hedgePush=Math.abs(hedgeAdj)<1e-8;
+  const p1=originalWin?s1*(d1-1):-s1;
+  const p2=hedgePush?0:hedgeWin?h*(d2-1):-h;
+  return {m,p1,p2,net:p1+p2,originalWin,hedgeWin,hedgePush};
+ });
+ const min=Math.min(...outcomes.map(x=>x.net)),max=Math.max(...outcomes.map(x=>x.net));
+ const label=n=>money(n);
+ el.innerHTML='<div class="result"><b>'+esc(t.game)+'</b><p>'+esc(t.team)+' moneyline '+(t.a>0?"+":"")+t.a+' · original stake '+label(s1)+'</p><p>Hedge: '+esc(t.opp)+' '+(line>0?"+":"")+line+' @ '+(opt.odds>0?"+":"")+opt.odds+' · proposed '+label(h)+'</p><p class="muted">Feed: '+esc(opt.market)+' · '+(opt.live?"marked LIVE":"live status not confirmed")+(opt.updated?" · updated "+esc(opt.updated):"")+'</p><hr><div class="row"><span>Combined total stakes</span><b>'+label(s1+h)+'</b></div><div class="row"><span>Worst illustrative net</span><b class="'+(min>=0?'good':'bad')+'">'+label(min)+'</b></div><div class="row"><span>Best illustrative net</span><b class="'+(max>=0?'good':'bad')+'">'+label(max)+'</b></div><hr><b>Final margin scenarios (original underdog perspective)</b>'+outcomes.map(x=>'<div class="row"><span>'+esc(t.team)+' '+(x.m>0?"+":"")+x.m+' · '+(x.originalWin?'ML wins':'ML loses')+' / '+(x.hedgePush?'spread pushes':x.hedgeWin?'spread wins':'spread loses')+'</span><b class="'+(x.net>=0?'good':'bad')+'">'+label(x.net)+'</b></div>').join("")+'</div><p class="muted">Illustrations are not exhaustive or probability-weighted. Original moneyline wins only if the underdog wins; the spread can win, lose, or push at different margins. This is not a locked-profit calculation or a recommendation to place the hedge.</p>';
+}
+
 $("calcButton").addEventListener("click",calculate);
 $("analyzeMiddle").addEventListener("click",analyzeSpreadMiddle);
+$("midTicket").addEventListener("change",fillAnalyzerTicket);
+$("midCandidate").addEventListener("change",selectAnalyzerCandidate);
 $("logBetButton").addEventListener("click",()=>{
  const game=$("game").value.trim(),team=$("team").value.trim(),opp=$("opponent").value.trim();
  const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
@@ -619,6 +681,7 @@ async function refreshOdds(){
   if(!nflCount)throw new Error("Feed loaded ("+latestOdds.length+" market rows), but no NFL/American-football markets were returned for this plan/board.");
   status.textContent="Loaded "+latestOdds.length+" markets · "+new Date().toLocaleTimeString();
   renderOdds();
+  refreshAnalyzerChoices();
   prefillOriginalMoneyline();
   prefillOpposingMoneyline();
  }catch(err){
