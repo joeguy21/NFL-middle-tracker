@@ -335,11 +335,13 @@ function renderOdds(){
   return '<div class="result"><b>'+esc(ev.fixture||"NFL game")+'</b><p class="muted">'+esc(ev.market||"Market")+' · '+(ev.inplay?"LIVE":"Pre-game")+' · '+esc(ev.status||"")+'</p>'+
    prices.map(p=>{
     let display=p.name||"";
+    // Numeric provider selection IDs are not team labels.
     if(!display||/^\\d+$/.test(String(display).trim()))display=savedTeamForSelection(ev,p);
+    const unresolved=!display||/^\\d+$/.test(String(display).trim());
     const id=outcomeIds(p)[0]||"";
     const gameIdx=$("matchup").value, gameObj=gameIdx!==""?scheduleEvents[Number(gameIdx)]:null;
     const isMoney=/money ?line|match winner|winner/i.test(String(ev.market||""));
-    const assignControls=isMoney&&gameObj&&id&&!display?
+    const assignControls=isMoney&&gameObj&&id&&unresolved?
      '<div class="status">Selection ID '+esc(id)+' — assign only after verifying its team in the sportsbook/feed:</div>'+
      '<div class="two"><button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.away).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.away)+'</button>'+
      '<button type="button" class="secondary" onclick="bindSelectionToTeam('+JSON.stringify(String(id))+','+JSON.stringify(gameObj.home).replace(/</g,'\\u003c')+')">This is '+esc(gameObj.home)+'</button></div>':'';
