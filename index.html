@@ -474,6 +474,43 @@ function activeAnalyzerTicket(){
  const i=Number($("midTicket").value);
  return $("midTicket").value!==""?tickets[i]||null:null;
 }
+async function refreshDetailedSpreadMarkets(){
+ const status=$("oddsStatus");
+ try{
+  const res=await fetch("/api/spread-lines",{cache:"no-store"});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||("Detailed spread service "+res.status));
+  const raw=Array.isArray(data)?data:(Array.isArray(data.markets)?data.markets:Array.isArray(data.results)?data.results:Array.isArray(data.data?.markets)?data.data.markets:[]);
+  if(!raw.length)throw new Error("Detailed endpoint returned no market rows.");
+  const detailRows=[];
+  for(const m of raw){
+   const category=String(m.category||m.market_type||"").toLowerCase();
+   const marketName=String(m.market_name||m.name||"");
+   if(!/spread/i.test(category+" "+marketName))continue;
+   const picks=Array.isArray(m.selections)?m.selections:Array.isArray(m.outcomes)?m.outcomes:[];
+   const prices=picks.map(p=>{
+    const raw=p.american??p.american_odds??p.us_odds??p.price_american??p.odds;
+    const n=Number(raw);
+    const odds=Number.isFinite(n)&&n!==0?n:(raw&&typeof raw==="object"?Number(raw.american??raw.us??raw.value):NaN);
+    const participant=p.name||p.selection_name||p.team_name||p.participant_name||p.participant?.name||p.team?.name||"";
+    const point=p.handicap??p.point??p.points??p.spread??p.line??null;
+    return {name:String(participant),selection:String(p.selection_id??p.id??""),participantId:String(p.participant_id??p.team_id??""),american:Number.isFinite(odds)&&odds!==0?Math.round(odds):null,point};
+   });
+   if(!prices.length)continue;
+   const fixture=String(m.event||m.fixture||m.event_name||"");
+   detailRows.push({sport:"NFL",fixture,market:marketName||"Spread",status:m.status||"",inplay:Boolean(m.inplay),updated_at:m.updated_at||"",fixtureId:String(m.event_id||""),participants:[],prices});
+  }
+  if(!detailRows.length)throw new Error("Detailed response contained no recognizable spread selections.");
+  // Detailed markets expose selections[].handicap, which the summary board omits.
+  latestOdds=latestOdds.filter(ev=>!/spread|handicap|point spread|alternate spread|team spread|game spread/i.test(String(ev.market||""))).concat(detailRows);
+  status.textContent+=" · Detailed spreads "+detailRows.length;
+  return true;
+ }catch(err){
+  console.warn("Detailed spread refresh:",err);
+  status.textContent+=" · Spread lines unavailable";
+  return false;
+ }
+}
 function fillAnalyzerTicket(){
  const t=activeAnalyzerTicket(),candidates=$("midCandidate");
  if(!t){candidates.innerHTML='<option value="">Select a saved original wager</option>';return}
@@ -743,7 +780,7 @@ async function refreshOdds(){
  }finally{btn.disabled=false}
 }
 $("refreshOdds").addEventListener("click",refreshOdds);
-$("refreshAnalyzerOdds").addEventListener("click",async()=>{await refreshOdds();fillAnalyzerTicket();});
+$("refreshAnalyzerOdds").addEventListener("click",async()=>{await refreshOdds();await refreshDetailedSpreadMarkets();fillAnalyzerTicket();});
 $("midTicket").addEventListener("change",fillAnalyzerTicket);
 $("oddsSearch").addEventListener("input",renderOdds);
 
