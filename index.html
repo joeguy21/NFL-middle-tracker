@@ -184,7 +184,7 @@ function bindSelectionToTeam(selectionId,teamName){
 function findSelectionPrice(teamName){
  const idx=$("matchup").value,g=idx!==""?scheduleEvents[Number(idx)]:null;
  if(!g)return null;
- const isML=ev=>/money\\s*line|match winner|winner/i.test(String(ev.market||""));
+ const isML=ev=>/money\s*line|match winner|winner/i.test(String(ev.market||""));
  const a=teamAliases(g.away),h=teamAliases(g.home);
  const matches=latestOdds.filter(ev=>{
   const fx=teamKey(ev.fixture||"");
@@ -196,7 +196,7 @@ function findSelectionPrice(teamName){
  for(const ev of matches){
   const direct=(ev.prices||[]).filter(p=>{
    const label=teamKey(p.name||"");
-   return label&&!/^\\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&
+   return label&&!/^\d+$/.test(label)&&aliases.some(a=>label===a||label.includes(a)||a.includes(label))&&
     Number.isFinite(Number(p.american))&&Number(p.american)!==0;
   });
   if(direct.length===1)return {odds:Number(direct[0].american),updated:ev.updated_at||"",fixture:ev.fixture||""};
@@ -319,7 +319,7 @@ function renderOdds(){
  }
  const away=teamAliases(chosen.away),home=teamAliases(chosen.home);
  const matches=latestOdds.filter(ev=>{
-  if(!/money\\s*line|match winner|winner/i.test(String(ev.market||"")))return false;
+  if(!/money\s*line|match winner|winner/i.test(String(ev.market||"")))return false;
   const fixture=teamKey(ev.fixture),sport=String(ev.sport||"").toLowerCase();
   if(!(/nfl|football/i.test(sport)||/\bnfl\b|football/i.test(fixture)))return false;
   const correctTeams=away.some(x=>fixture.includes(x))&&home.some(x=>fixture.includes(x));
@@ -336,8 +336,8 @@ function renderOdds(){
    prices.map(p=>{
     let display=p.name||"";
     // Numeric provider selection IDs are not team labels.
-    if(!display||/^\\d+$/.test(String(display).trim()))display=savedTeamForSelection(ev,p);
-    const unresolved=!display||/^\\d+$/.test(String(display).trim());
+    if(!display||/^\d+$/.test(String(display).trim()))display=savedTeamForSelection(ev,p);
+    const unresolved=!display||/^\d+$/.test(String(display).trim());
     const id=outcomeIds(p)[0]||"";
     const gameIdx=$("matchup").value, gameObj=gameIdx!==""?scheduleEvents[Number(gameIdx)]:null;
     const isMoney=/money ?line|match winner|winner/i.test(String(ev.market||""));
@@ -382,7 +382,7 @@ async function refreshOdds(){
   // Odds fields may arrive as American prices, decimal prices, or nested price objects.
   function toAmerican(raw){
    if(raw&&typeof raw==="object") raw=raw.american??raw.us??raw.value??raw.price??raw.odds;
-   if(typeof raw==="string") raw=raw.trim().replace(/^US\\s*/i,"");
+   if(typeof raw==="string") raw=raw.trim().replace(/^US\s*/i,"");
    const n=Number(raw);
    if(!Number.isFinite(n)||n===0)return null;
    if(n<=-100||n>=100)return Math.round(n);
@@ -449,7 +449,7 @@ async function refreshOdds(){
       p?.participant_id,p?.team_id,p?.competitor_id,p?.participant?.id,p?.team?.id,
       p?.external_id,p?.provider_id,p?.selection?.id,p?.outcome?.id]
      .filter(v=>v!==undefined&&v!==null).map(v=>String(v));
-    const looksLikeId=/^\\d+$/.test(String(out.name||"").trim());
+    const looksLikeId=/^\d+$/.test(String(out.name||"").trim());
     if(!out.name||looksLikeId){
      const candidate=keys.map(k=>participantById.get(k)).find(Boolean);
      if(candidate)out.name=String(candidate);
