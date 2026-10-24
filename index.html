@@ -104,13 +104,13 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 <div><label>Original moneyline odds</label><input id="midOriginalOdds" readonly></div>
 <div><label>Original actual stake ($)</label><input id="midOriginalStake" readonly></div>
 </div>
-<label for="midCandidate">Available opposing FanDuel live spread</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select>
 <div class="two">
-<div><label for="midLiveLine">Selected opposing spread</label><input id="midLiveLine" readonly></div>
-<div><label for="midLiveOdds">Selected spread odds</label><input id="midLiveOdds" readonly></div>
-<div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" type="number" min="0" step="0.01" placeholder="Enter planned hedge"></div>
+<div><label for="midCandidate">Available opposing FanDuel live spread</label><select id="midCandidate"><option value="">Refresh odds and select a saved matchup</option></select></div>
+<div><label for="midLiveLine">Opposing spread</label><input id="midLiveLine" readonly placeholder="Auto-filled from selected live line"></div>
+<div><label for="midLiveOdds">Opposing spread odds</label><input id="midLiveOdds" readonly placeholder="Current FanDuel price"></div>
+<div><label for="midLiveStake">Proposed opposing stake ($)</label><input id="midLiveStake" readonly placeholder="Auto-calculated"></div>
 </div>
-<button class="primary" type="button" id="analyzeMiddle">ANALYZE MONEYLINE + SPREAD HEDGE</button>
+<button class="primary" type="button" id="analyzeMiddle">ANALYZE HEDGE OUTCOMES</button>
 <div id="middleResults" aria-live="polite"></div>
 <div class="notice">This compares your original underdog moneyline with a selected opposing spread. It is a hedge/scenario analyzer—not a conventional two-spread middle. Results use final-margin illustrations and the displayed spread handicap, not a prediction of the game's finish. Spread data is shown only when the feed supplies a recognizable opposing-team label and handicap; verify current market, score, odds, and ticket settlement before betting.</div>
 </section>
@@ -440,21 +440,27 @@ function fillAnalyzerTicket(){
  $("midOriginalStake").value=money(Number(t.s));
  const options=spreadCandidates(t);
  candidates.innerHTML="";
- if(!options.length)candidates.append(new Option("No clearly matched opposing spread in current feed",""));
+ if(!options.length)candidates.append(new Option("No matched opposing spread in current feed",""));
  else{
-  candidates.append(new Option("Choose opposing spread…",""));
+  candidates.append(new Option("Choose current opposing spread…",""));
   options.forEach((x,i)=>candidates.append(new Option(x.team+" "+(x.point>0?"+":"")+x.point+" @ "+(x.odds>0?"+":"")+x.odds+(x.live?" · LIVE":""),String(i))));
  }
  candidates.dataset.options=JSON.stringify(options);
- $("midLiveLine").value="";$("midLiveOdds").value="";
- $("middleResults").innerHTML=options.length?"":'<p class="muted">No unambiguous opposing-team spread was found. Refresh live odds, or wait for spread markets to be available. Do not guess team/line assignments.</p>';
+ $("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value="";
+ $("middleResults").innerHTML=options.length?"":'<p class="muted">No clearly matched opposing spread was found. Refresh the odds feed. This can happen if the feed has no current spread market or does not identify the opposing selection clearly.</p>';
 }
 function selectAnalyzerCandidate(){
- const options=JSON.parse($("midCandidate").dataset.options||"[]"),x=options[Number($("midCandidate").value)];
- if(!x){$("midLiveLine").value="";$("midLiveOdds").value="";return}
+ const options=JSON.parse($("midCandidate").dataset.options||"[]"),x=options[Number($("midCandidate").value)],t=activeAnalyzerTicket();
+ if(!x||!t){$("midLiveLine").value="";$("midLiveOdds").value="";$("midLiveStake").value="";return}
  $("midLiveLine").value=(x.point>0?"+":"")+x.point;
  $("midLiveOdds").value=(x.odds>0?"+":"")+x.odds;
+ const originalDec=dec(t.a),hedgeDec=dec(x.odds),stake=Number(t.s);
+ // Equalize two reference cases: original dog wins vs opponent covers its spread.
+ // This does NOT neutralize the range where the favorite wins but fails to cover.
+ const suggested=originalDec&&hedgeDec&&stake>0?Math.round(stake*originalDec/hedgeDec*100)/100:null;
+ $("midLiveStake").value=suggested===null?"":suggested.toFixed(2);
 }
+
 function analyzeSpreadMiddle(){
  const t=activeAnalyzerTicket(),opt=JSON.parse($("midCandidate").dataset.options||"[]")[Number($("midCandidate").value)];
  const h=Number($("midLiveStake").value),el=$("middleResults");
@@ -471,7 +477,7 @@ function analyzeSpreadMiddle(){
  });
  const min=Math.min(...outcomes.map(x=>x.net)),max=Math.max(...outcomes.map(x=>x.net));
  const label=n=>money(n);
- el.innerHTML='<div class="result"><b>'+esc(t.game)+'</b><p>'+esc(t.team)+' moneyline '+(t.a>0?"+":"")+t.a+' · original stake '+label(s1)+'</p><p>Hedge: '+esc(t.opp)+' '+(line>0?"+":"")+line+' @ '+(opt.odds>0?"+":"")+opt.odds+' · proposed '+label(h)+'</p><p class="muted">Feed: '+esc(opt.market)+' · '+(opt.live?"marked LIVE":"live status not confirmed")+(opt.updated?" · updated "+esc(opt.updated):"")+'</p><hr><div class="row"><span>Combined total stakes</span><b>'+label(s1+h)+'</b></div><div class="row"><span>Worst illustrative net</span><b class="'+(min>=0?'good':'bad')+'">'+label(min)+'</b></div><div class="row"><span>Best illustrative net</span><b class="'+(max>=0?'good':'bad')+'">'+label(max)+'</b></div><hr><b>Final margin scenarios (original underdog perspective)</b>'+outcomes.map(x=>'<div class="row"><span>'+esc(t.team)+' '+(x.m>0?"+":"")+x.m+' · '+(x.originalWin?'ML wins':'ML loses')+' / '+(x.hedgePush?'spread pushes':x.hedgeWin?'spread wins':'spread loses')+'</span><b class="'+(x.net>=0?'good':'bad')+'">'+label(x.net)+'</b></div>').join("")+'</div><p class="muted">Illustrations are not exhaustive or probability-weighted. Original moneyline wins only if the underdog wins; the spread can win, lose, or push at different margins. This is not a locked-profit calculation or a recommendation to place the hedge.</p>';
+ el.innerHTML='<div class="result"><b>'+esc(t.game)+'</b><p>'+esc(t.team)+' moneyline '+(t.a>0?"+":"")+t.a+' · original stake '+label(s1)+'</p><p>Hedge: '+esc(t.opp)+' '+(line>0?"+":"")+line+' @ '+(opt.odds>0?"+":"")+opt.odds+' · proposed '+label(h)+'</p><p class="muted">Feed: '+esc(opt.market)+' · '+(opt.live?"marked LIVE":"live status not confirmed")+(opt.updated?" · updated "+esc(opt.updated):"")+'</p><hr><div class="row"><span>Combined total stakes</span><b>'+label(s1+h)+'</b></div><div class="row"><span>Worst illustrative net</span><b class="'+(min>=0?'good':'bad')+'">'+label(min)+'</b></div><div class="row"><span>Best illustrative net</span><b class="'+(max>=0?'good':'bad')+'">'+label(max)+'</b></div><hr><b>Final margin scenarios (original underdog perspective)</b>'+outcomes.map(x=>'<div class="row"><span>'+esc(t.team)+' '+(x.m>0?"+":"")+x.m+' · '+(x.originalWin?'ML wins':'ML loses')+' / '+(x.hedgePush?'spread pushes':x.hedgeWin?'spread wins':'spread loses')+'</span><b class="'+(x.net>=0?'good':'bad')+'">'+label(x.net)+'</b></div>').join("")+'</div><p class="muted">Illustrations are not exhaustive or probability-weighted. Original moneyline wins only if the underdog wins; the spread can win, lose, or push at different margins. The auto stake equalizes the two reference outcomes (underdog wins vs opponent covers); it does not protect the margin range where the opponent wins outright but fails to cover. This is not a locked-profit calculation or a recommendation to place the hedge.</p>';
 }
 
 $("calcButton").addEventListener("click",calculate);
