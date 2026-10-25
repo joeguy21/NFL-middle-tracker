@@ -1,4 +1,25 @@
 -- Proposed additive schema for tracked-ticket registration and durable delivery.
+-- Principal/device registry: provision principals through a trusted admin path.
+-- Store only credential hashes; raw bearer tokens are returned once at issuance.
+CREATE TABLE IF NOT EXISTS alert_principals (
+  principal_id TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  disabled_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS alert_devices (
+  device_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL REFERENCES alert_principals(principal_id),
+  credential_hash CHAR(64) NOT NULL UNIQUE,
+  platform TEXT NOT NULL CHECK (platform IN ('ios','web')),
+  push_endpoint JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS alert_devices_principal_active_idx
+  ON alert_devices (principal_id) WHERE revoked_at IS NULL;
+
 -- NOT applied to any database. Requires authenticated principal IDs from a
 -- separately designed auth/session layer before endpoint integration.
 
