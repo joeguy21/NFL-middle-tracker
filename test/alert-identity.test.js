@@ -35,3 +35,9 @@ test("rejects incomplete or unsupported alert identities", () => {
   assert.throws(() => alertKey({ ...base, kind: "middle" }));
   assert.throws(() => alertKey({ ...base, kind: "push" }));
 });
+
+test("muted games suppress middle and hedge candidates", () => {
+  assert.equal(shouldNotify({ kind: "middle", width: 8, gameMuted: true }), false);
+  assert.equal(shouldNotify({ kind: "hedge", milestone: "Q1", gameMuted: true }), false);
+  assert.equal(shouldNotify({ kind: "middle", width: 8, gameMuted: false }), true);
+});
