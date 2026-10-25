@@ -38,10 +38,26 @@ hr{border:0;border-top:1px solid #34445e;margin:15px 0}
 footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 @media(min-width:600px){.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.two>div{min-width:0}}
 </style>
-</head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n</head>
 <body>
 <header><h1>🏈 NFL Middle Tracker</h1><small>Hedge • Middle • Manage Risk</small></header>
-<main>
+<main>\n<section class="card" id="accountCard">
+<h2>🔐 Your account</h2>
+<p class="muted">Sign in to save your tracker records privately and access them across devices.</p>
+<div id="authSignedOut">
+<label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+<label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters">
+<div class="two"><button class="primary" id="authSignIn" type="button">SIGN IN</button><button class="secondary" id="authSignUp" type="button">CREATE ACCOUNT</button></div>
+</div>
+<div id="authSignedIn" hidden>
+<p class="status good" id="authWho"></p>
+<div class="two"><button class="secondary" id="cloudLoad" type="button">LOAD MY CLOUD RECORDS</button><button class="secondary" id="authSignOut" type="button">SIGN OUT</button></div>
+<button class="primary" id="cloudImport" type="button">IMPORT THIS BROWSER'S SAVED RECORDS</button>
+<p class="muted">Import is optional. It uploads records currently stored in this browser into your account. Only use it if these are your records.</p>
+</div>
+<p class="status" id="authStatus" aria-live="polite">Account sign-in is being initialized.</p>
+</section>
+
 <section class="card">
 <h2>Choose a game</h2>
 <div class="two">
@@ -130,11 +146,119 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </main>
 <script>
 let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
+let authClient=null,authSession=null,cloudSyncBusy=false,cloudSyncTimer=null;
+async function initAccount(){
+ const status=$("authStatus");
+ try{
+  const configResponse=await fetch("/api/auth-config",{cache:"no-store"});
+  const config=await configResponse.json();
+  if(!configResponse.ok||!config.url||!config.publishableKey)throw Error(config.error||"Account sign-in is not configured yet.");
+  if(!window.supabase?.createClient)throw Error("Secure sign-in library did not load. Refresh and retry.");
+  authClient=window.supabase.createClient(config.url,config.publishableKey);
+  const {data,error}=await authClient.auth.getSession();if(error)throw error;
+  authSession=data.session;
+  authClient.auth.onAuthStateChange((event,session)=>{
+   authSession=session;
+   setTimeout(()=>syncAuthPanel(event),0);
+  });
+  await syncAuthPanel("init");
+ }catch(e){status.textContent="Accounts are not ready yet: "+(e.message||"setup incomplete");}
+}
+function setAuthStatus(msg,good=false){const n=$("authStatus");n.textContent=msg;n.className="status"+(good?" good":"")}
+async function syncAuthPanel(event){
+ const yes=!!authSession;
+ $("authSignedOut").hidden=yes;$("authSignedIn").hidden=!yes;
+ if(!yes){$("authWho").textContent="";setAuthStatus("Sign in or create an account to use private cloud records.");return}
+ $("authWho").textContent="Signed in as "+(authSession.user.email||"your account");
+ setAuthStatus("Signed in. Load cloud records to continue.",true);
+ if(event==="SIGNED_IN"||event==="init"){
+  try{await loadCloudRecords(false)}catch(e){setAuthStatus("Signed in, but cloud records couldn't load: "+e.message)}
+ }
+}
+async function accountRequest(path,options={}){
+ if(!authSession?.access_token)throw Error("Sign in first.");
+ const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",Authorization:"Bearer "+authSession.access_token,...(options.headers||{})}});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(data.error||"Account service error ("+response.status+")");
+ return data;
+}
+async function loadCloudRecords(showMsg=true){
+ if(!authSession)return;
+ const data=await accountRequest("/api/my-ledger");
+ const records=Array.isArray(data.records)?data.records:[];
+ // Keep a browser-local recovery copy before replacing the active view.
+ try{localStorage.setItem("nfltracker_backup_"+authSession.user.id,localStorage.getItem("nfltracker")||"[]")}catch{}
+ bets=records;
+ localStorage.setItem("nfltracker",JSON.stringify(bets));render();
+ if(showMsg)setAuthStatus("Loaded "+records.length+" private cloud record(s).",true);
+ else setAuthStatus("Account ready. "+records.length+" private cloud record(s) loaded.",true);
+}
+async function uploadAccountRecords(records){
+ const data=await accountRequest("/api/my-ledger/sync",{method:"POST",body:JSON.stringify({records})});
+ return data.synced;
+}
+async function importBrowserRecords(){
+ if(!authSession)return;
+ const local=JSON.parse(localStorage.getItem("nfltracker")||"[]");
+ if(!local.length){setAuthStatus("There are no browser records to import.");return}
+ if(!confirm("Import "+local.length+" records from THIS browser into "+authSession.user.email+"? Continue only if these records belong to you."))return;
+ try{
+  const cloud=await accountRequest("/api/my-ledger");
+  const map=new Map((cloud.records||[]).map(r=>[String(r.id),r]));
+  for(const r of local){if(r&&r.id!=null&&!map.has(String(r.id)))map.set(String(r.id),r)}
+  const all=[...map.values()];
+  const n=await uploadAccountRecords(all);
+  bets=all;localStorage.setItem("nfltracker",JSON.stringify(bets));render();
+  setAuthStatus("Imported/reconciled records. "+n+" record(s) synced to your account.",true);
+ }catch(e){setAuthStatus("Import failed; browser copy remains intact: "+e.message)}
+}
+$("authSignIn").addEventListener("click",async()=>{
+ if(!authClient)return setAuthStatus("Account setup isn't ready yet.");
+ const email=$("authEmail").value.trim(),password=$("authPassword").value;
+ if(!email||!password)return setAuthStatus("Enter your email and password.");
+ $("authSignIn").disabled=true;
+ try{const {error}=await authClient.auth.signInWithPassword({email,password});if(error)throw error;setAuthStatus("Signed in.",true)}
+ catch(e){setAuthStatus(e.message||"Sign-in failed.")}
+ finally{$("authSignIn").disabled=false}
+});
+$("authSignUp").addEventListener("click",async()=>{
+ if(!authClient)return setAuthStatus("Account setup isn't ready yet.");
+ const email=$("authEmail").value.trim(),password=$("authPassword").value;
+ if(!email||!password)return setAuthStatus("Enter your email and choose a password.");
+ if(password.length<8)return setAuthStatus("Use a password with at least 8 characters.");
+ $("authSignUp").disabled=true;
+ try{
+  const {data,error}=await authClient.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
+  if(error)throw error;
+  if(data.session)setAuthStatus("Account created and signed in.",true);
+  else setAuthStatus("Account created. Check your email to confirm, then return here and sign in.",true);
+ }catch(e){setAuthStatus(e.message||"Account creation failed.")}
+ finally{$("authSignUp").disabled=false}
+});
+$("authSignOut").addEventListener("click",async()=>{
+ if(!authClient)return;
+ try{const {error}=await authClient.auth.signOut();if(error)throw error;authSession=null;setAuthStatus("Signed out. Your records remain saved in this browser.");}
+ catch(e){setAuthStatus("Sign-out failed: "+e.message)}
+});
+$("cloudLoad").addEventListener("click",async()=>{try{await loadCloudRecords(true)}catch(e){setAuthStatus("Cloud load failed: "+e.message)}});
+$("cloudImport").addEventListener("click",importBrowserRecords);
+function queueCloudSync(){
+ if(!authSession||cloudSyncBusy)return;
+ clearTimeout(cloudSyncTimer);
+ cloudSyncTimer=setTimeout(async()=>{
+  if(!authSession||cloudSyncBusy)return;
+  cloudSyncBusy=true;
+  try{const n=await uploadAccountRecords(bets);setAuthStatus("Saved locally and synced "+n+" record(s) to your private account.",true)}
+  catch(e){setAuthStatus("Saved in this browser; cloud sync failed: "+e.message)}
+  finally{cloudSyncBusy=false}
+ },900);
+}
+
 let pending=null, scheduleEvents=[];
 const $=id=>document.getElementById(id);
 function dec(a){a=Number(a);if(!a||!Number.isFinite(a))return null;return a>0?1+a/100:1+100/Math.abs(a)}
 function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
-function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render()}
+function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render();queueCloudSync()}
 
 function teamsFromEvent(ev){
  const comps=ev.competitions?.[0]?.competitors||[];
