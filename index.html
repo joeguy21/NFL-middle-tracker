@@ -239,8 +239,13 @@ $("authSignUp").addEventListener("click",async()=>{
 });
 $("authSignOut").addEventListener("click",async()=>{
  if(!authClient)return;
- try{const {error}=await authClient.auth.signOut();if(error)throw error;authSession=null;setAuthStatus("Signed out. Your records remain saved in this browser.");}
- catch(e){setAuthStatus("Sign-out failed: "+e.message)}
+ try{
+  // Preserve the signed-in account's current view separately, then clear sensitive rows from this shared screen.
+  if(authSession?.user?.id)localStorage.setItem("nfltracker_backup_"+authSession.user.id,JSON.stringify(bets));
+  const {error}=await authClient.auth.signOut();if(error)throw error;
+  authSession=null;bets=[];localStorage.setItem("nfltracker","[]");render();
+  setAuthStatus("Signed out. This screen was cleared; your account records remain in your private cloud.");
+ }catch(e){setAuthStatus("Sign-out failed: "+e.message)}
 });
 $("cloudLoad").addEventListener("click",async()=>{try{await loadCloudRecords(true)}catch(e){setAuthStatus("Cloud load failed: "+e.message)}});
 $("cloudImport").addEventListener("click",importBrowserRecords);
