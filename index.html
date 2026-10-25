@@ -167,6 +167,15 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </main>
 <script src="/bet-math.js"></script>
 <script>
+/* Surface startup failures on-screen so a broken auth bootstrap never leaves inert controls. */
+window.addEventListener("error",event=>{
+ const node=document.getElementById("authStatus");
+ if(node){node.textContent="App startup error: "+(event.message||"script failed to run")+". Reload once; your saved records were not intentionally changed.";node.className="status bad";}
+});
+window.addEventListener("unhandledrejection",event=>{
+ const node=document.getElementById("authStatus");
+ if(node){const reason=event.reason;node.textContent="App startup request failed: "+(reason?.message||String(reason||"unknown error"))+".";node.className="status bad";}
+});
 let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
 let authClient=null,authSession=null,cloudSyncBusy=false,cloudSyncTimer=null;
 async function initAccount(){
