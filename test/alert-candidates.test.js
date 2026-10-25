@@ -11,6 +11,12 @@ const market={marketType:"spread",period:"full_game",observedAt:new Date(now-100
 test("fresh tracked-game opposing lines yield middle candidate >3",()=>{
  const r=evaluateTrackedTicket({ticket,market,game,nowMs:now});
  assert.equal(r.eligible,true);assert.equal(r.candidate.width,4);assert.equal(r.candidate.qualifies,true);
+ assert.equal(r.candidate.type,"middle");
+ assert.equal(r.candidate.original.stake,100);
+ assert.equal(r.candidate.opposingOdds,-105);
+ assert.ok(r.candidate.hedgeEstimate.hedge>0);
+ assert.equal(r.candidate.hedgeEstimate.originalWins, r.candidate.hedgeEstimate.hedgeWins);
+ assert.equal(r.candidate.score.away,null);
 });
 test("exactly three points does not qualify",()=>{
  const m={...market,outcomes:[market.outcomes[0],{...market.outcomes[1],spread:6}]};
