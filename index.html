@@ -630,7 +630,7 @@ function spreadCandidates(ticket){
 }
 function refreshAnalyzerChoices(){
  const sel=$("midTicket"),prev=sel.value;
- const tickets=bets.filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
+ const tickets=visibleBets().filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
  sel.innerHTML='<option value="">Select saved original moneyline…</option>';
  tickets.forEach((t,i)=>sel.append(new Option(t.game+" · "+t.team+" ML "+(t.a>0?"+":"")+t.a+" · "+money(t.s),String(i))));
  // Keep a stable identity by using the array index only for this refresh.
@@ -639,7 +639,7 @@ function refreshAnalyzerChoices(){
  fillAnalyzerTicket();
 }
 function activeAnalyzerTicket(){
- const tickets=bets.filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
+ const tickets=visibleBets().filter(b=>b.recordType==="ticket"&&Number(b.s)>0&&dec(b.a));
  const i=Number($("midTicket").value);
  return $("midTicket").value!==""?tickets[i]||null:null;
 }
