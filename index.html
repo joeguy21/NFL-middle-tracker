@@ -153,6 +153,7 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </section>
 <footer>Hedge estimates use manually entered American odds and assume opposite outcomes settle normally. Confirm market type, accepted price, limits, pushes/voids, and actual bet receipt before relying on a result. Saved records remain in this browser's local storage; they are not written into the public GitHub repository.</footer>
 </main>
+<script src="/bet-math.js"></script>
 <script>
 let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
 let authClient=null,authSession=null,cloudSyncBusy=false,cloudSyncTimer=null;
@@ -289,7 +290,7 @@ async function runCloudSync(){
 
 let pending=null, scheduleEvents=[];
 const $=id=>document.getElementById(id);
-function dec(a){a=Number(a);if(!a||!Number.isFinite(a))return null;return a>0?1+a/100:1+100/Math.abs(a)}
+function dec(a){return BetMath.decimalOdds(a)}
 function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
 function newRecordId(){return globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():"rec-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2)}
 function selectedWeekScope(){return {season:String($("season").value),week:String($("week").value)}}
@@ -536,10 +537,8 @@ function calculate(){
  const d=dec(a),e=dec(b),out=$("calc");pending=null;
  if(!game||!team||!opp||!d||!e||s<=0||!Number.isFinite(s)){out.innerHTML='<p class="bad">Enter game, both teams, valid odds and your actual stake.</p>';return}
  if(team.toLowerCase()===opp.toLowerCase()){out.innerHTML='<p class="bad">The selected team and opponent must be different.</p>';return}
- const h=Math.round(s*d/e*100)/100;
- const win1=Math.round((s*(d-1)-h)*100)/100;
- const win2=Math.round((-s+h*(e-1))*100)/100;
- const guaranteed=Math.min(win1,win2),total=s+h,roi=guaranteed/total*100;
+ const math=BetMath.equalReturnHedge({stake:s,originalOdds:a,hedgeOdds:b});
+ const {hedge:h,originalWins:win1,hedgeWins:win2,worstCase:guaranteed,totalStake:total,roi}=math;
  pending={game,team,opp,book,hb,a,b,s,h,win1,win2,guaranteed,roi,locked:false,id:newRecordId()};
  out.innerHTML='<div class="result"><div class="row"><span>Original bet</span><b>'+money(s)+'</b></div><div class="row"><span>Suggested opposing hedge</span><b>'+money(h)+'</b></div><div class="row"><span>Hedge book</span><b>'+esc(hb)+'</b></div><hr><div class="row"><span>Total stakes</span><b>'+money(total)+'</b></div><div class="row"><span>'+esc(team)+' wins</span><b class="'+(win1>=0?'good':'bad')+'">'+money(win1)+'</b></div><div class="row"><span>'+esc(opp)+' wins</span><b class="'+(win2>=0?'good':'bad')+'">'+money(win2)+'</b></div><hr><div>Worst-case net estimate</div><div class="stat">'+money(guaranteed)+'</div><p>Estimated ROI: '+roi.toFixed(2)+'%</p></div><p class="muted">Equal-return hedge, rounded to cents. This is based on the prices you typed in, not live-verified odds.</p><button class="primary" type="button" id="saveRec">TRACK BET</button>';
  $("saveRec").addEventListener("click",record);
