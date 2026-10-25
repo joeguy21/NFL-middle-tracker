@@ -216,10 +216,9 @@ async function syncAuthPanel(event){
  byId("authSignedOut").hidden=yes;byId("authSignedIn").hidden=!yes;
  if(!yes){byId("authWho").textContent="";setAuthStatus("Sign in or create an account to use private cloud records.");return}
  byId("authWho").textContent="Signed in as "+(authSession.user.email||"your account");
- setAuthStatus("Signed in. Load cloud records to continue.",true);
- if(event==="SIGNED_IN"||event==="init"){
-  try{await loadCloudRecords(false)}catch(e){setAuthStatus("Signed in, but cloud records couldn't load: "+e.message)}
- }
+ // Keep authentication independent from ledger/database availability. A ledger error
+ // must not make successful account creation or sign-in appear to have failed.
+ setAuthStatus("Signed in. Tap LOAD MY CLOUD RECORDS when you're ready.",true);
 }
 async function muteTrackedGame(gameId){if(!authSession)throw Error("Sign in to mute this game across devices.");if(!gameId)throw Error("This older record has no ESPN event ID. Use a newly logged wager or selected matchup.");await accountRequest("/api/my-notifications/mute-game",{method:"POST",body:JSON.stringify({gameId:String(gameId)})});await refreshMutedGames();alert("Game muted. Future monitoring alerts for this event are suppressed.");}
 let mutedEventIds=[];
