@@ -20,7 +20,7 @@ jobs:
           import re
           from pathlib import Path
           html = Path("index.html").read_text()
-          scripts = re.findall(r'<script\\b[^>]*>(.*?)</script\\s*>', html, re.I | re.S)
+          scripts = re.findall(r'<script\b[^>]*>(.*?)</script\s*>', html, re.I | re.S)
           scripts = [s for s in scripts if s.strip()]
           if not scripts:
               raise SystemExit("No inline application script found")
