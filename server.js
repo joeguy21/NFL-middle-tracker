@@ -7,6 +7,8 @@ async function readBody(req){let b="";for await(const x of req){b+=x;if(b.length
 function auth(req){let k=req.headers["x-tracker-key"];return !!ACCESS&&typeof k==="string"&&k.length===ACCESS.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(ACCESS))}
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,`http://${req.headers.host||"localhost"}`);
 if(u.pathname==="/api/health")return send(res,200,{ok:true,keyConfigured:!!API_KEY,ledgerConfigured:!!pool&&!!ACCESS});
+if(req.method==="GET"&&u.pathname==="/api/auth-config"){if(!SUPABASE_URL||!SUPABASE_PUBLISHABLE_KEY)return send(res,503,{ok:false,error:"Authentication configuration is missing."});return send(res,200,{ok:true,url:SUPABASE_URL,publishableKey:SUPABASE_PUBLISHABLE_KEY})}
+
 // The former global-key ledger exposed one shared collection. It is intentionally retired.
 if(u.pathname.startsWith("/api/ledger"))return send(res,410,{ok:false,error:"The shared ledger has been retired. Sign-in based sync is being introduced; legacy cloud records were not copied to user accounts."});
 if(u.pathname.startsWith("/api/my-ledger")){
