@@ -167,6 +167,8 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </main>
 <script src="/bet-math.js"></script>
 <script>
+// Declare DOM selector before startup routines and listeners use it.
+const $=id=>document.getElementById(id);
 /* Surface startup failures on-screen so a broken auth bootstrap never leaves inert controls. */
 window.addEventListener("error",event=>{
  const node=document.getElementById("authStatus");
@@ -334,7 +336,7 @@ async function runCloudSync(){
 }
 
 let pending=null, scheduleEvents=[];
-const $=id=>document.getElementById(id);
+
 function dec(a){return BetMath.decimalOdds(a)}
 function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
 function newRecordId(){return globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():"rec-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2)}
