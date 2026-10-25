@@ -1,0 +1,32 @@
+name: Validate tracker code
+on:
+  push:
+    branches: [feature/main-alerts-foundation]
+  pull_request:
+    branches: [main]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run calculation tests
+        run: npm test
+      - name: Check server syntax
+        run: node --check server.js
+      - name: Extract and check browser script
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path("index.html").read_text()
+          scripts = re.findall(r'<script\\b[^>]*>(.*?)</script\\s*>', html, re.I | re.S)
+          scripts = [s for s in scripts if s.strip()]
+          if not scripts:
+              raise SystemExit("No inline application script found")
+          Path("/tmp/tracker-inline.js").write_text(scripts[-1])
+          print(f"Extracted application script ({len(scripts[-1])} chars)")
+          PY
+          node --check /tmp/tracker-inline.js
