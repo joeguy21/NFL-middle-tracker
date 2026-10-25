@@ -1,10 +1,9 @@
 "use strict";
 
 // Pure candidate selection layer. Inputs must already be matched to a tracked
-// ticket and normalized market snapshot by the caller. This module never fetches
-// data, sends notifications, or places wagers.
+// ticket and a single, normalized full-game spread market snapshot by caller.
+// This module never fetches data, sends notifications, or places wagers.
 const { middleWindow } = require("./middle-rules");
-const { shouldNotify } = require("./alert-identity");
 
 function isFresh(snapshot, nowMs, maxAgeMs) {
   const stamp = Date.parse(snapshot?.observedAt || "");
@@ -13,39 +12,57 @@ function isFresh(snapshot, nowMs, maxAgeMs) {
     nowMs >= stamp && nowMs - stamp <= maxAgeMs;
 }
 
-function evaluateTrackedTicket({ ticket, market, game, nowMs = Date.now(), maxAgeMs = 90_000, gameMuted = false, priorKeys = new Set() }) {
-  if (!ticket || !ticket.id || !ticket.gameId || !ticket.team || !Number.isFinite(Number(ticket.spread)) ||
-      !(Number(ticket.stake) > 0) || !Number.isFinite(Number(ticket.odds)) || Number(ticket.odds) === 0) {
+function finiteNonzero(value) {
+  // Reject blanks/nulls: Number("") and Number(null) are both zero.
+  return value !== "" && value != null && Number.isFinite(Number(value)) && Number(value) !== 0;
+}
+function finite(value) {
+  return value !== "" && value != null && Number.isFinite(Number(value));
+}
+
+function evaluateTrackedTicket({ ticket, market, game, nowMs = Date.now(), maxAgeMs = 90_000, gameMuted = false }) {
+  if (!ticket || ticket.id == null || String(ticket.id).trim() === "" ||
+      ticket.gameId == null || String(ticket.gameId).trim() === "" ||
+      !ticket.team || !finite(ticket.spread) || !finite(ticket.stake) ||
+      !(Number(ticket.stake) > 0) || !finiteNonzero(ticket.odds)) {
     return { eligible: false, reason: "invalid-ticket" };
   }
   if (String(ticket.gameId) !== String(game?.id)) return { eligible: false, reason: "game-mismatch" };
-  if (!game?.scoreValid || !["in"].includes(game.state) || game.completed) return { eligible: false, reason: "game-not-live-or-score-invalid" };
-  if (!market || !isFresh(market, nowMs, maxAgeMs)) return { eligible: false, reason: "market-stale-or-unknown" };
+  if (!game?.scoreValid || game.state !== "in" || game.completed) return { eligible: false, reason: "game-not-live-or-score-invalid" };
+  if (!market || market.marketType !== "spread" || market.period !== "full_game" ||
+      !isFresh(market, nowMs, maxAgeMs)) return { eligible: false, reason: "market-stale-unknown-or-unsupported" };
   if (gameMuted) return { eligible: false, reason: "game-muted" };
-  if (!Array.isArray(market.outcomes) || market.outcomes.length < 2) return { eligible: false, reason: "incomplete-market" };
+  if (!Array.isArray(market.outcomes) || market.outcomes.length !== 2) return { eligible: false, reason: "incomplete-market" };
 
-  const opposite = market.outcomes.find(x =>
-    x && String(x.team || "").toLowerCase() !== String(ticket.team).toLowerCase() &&
-    Number.isFinite(Number(x.spread)) && Number.isFinite(Number(x.odds)) && Number(x.odds) !== 0
-  );
-  if (!opposite) return { eligible: false, reason: "opposing-side-unavailable" };
+  const same = market.outcomes.filter(x => x && String(x.team || "").toLowerCase() === String(ticket.team).toLowerCase());
+  const opposite = market.outcomes.filter(x => x && String(x.team || "").toLowerCase() !== String(ticket.team).toLowerCase());
+  if (same.length !== 1 || opposite.length !== 1) return { eligible: false, reason: "market-team-mismatch" };
+  const own = same[0], other = opposite[0];
+  if (!finite(own.spread) || !finite(own.odds) || Number(own.odds) === 0 ||
+      !finite(other.spread) || !finiteNonzero(other.odds)) {
+    return { eligible: false, reason: "invalid-market-outcome" };
+  }
+  // Do not compare the ticket to a stale/mismatched quote on its side.
+  if (Number(own.spread) !== Number(ticket.spread)) return { eligible: false, reason: "ticket-line-mismatch" };
+
   const width = middleWindow({
     firstTeam: ticket.team, firstSpread: Number(ticket.spread),
-    secondTeam: opposite.team, secondSpread: Number(opposite.spread)
+    secondTeam: other.team, secondSpread: Number(other.spread)
   }).width;
-  const identityBase = { ticketId: String(ticket.id), gameId: String(game.id) };
-  const candidate = {
-    type: "middle",
-    width,
-    originalTicketId: String(ticket.id),
-    gameId: String(game.id),
-    opposingTeam: String(opposite.team),
-    opposingSpread: Number(opposite.spread),
-    opposingOdds: Number(opposite.odds),
-    marketObservedAt: market.observedAt
+  return {
+    eligible: true,
+    candidate: {
+      type: "middle",
+      width,
+      qualifies: width > 3,
+      originalTicketId: String(ticket.id),
+      gameId: String(game.id),
+      opposingTeam: String(other.team),
+      opposingSpread: Number(other.spread),
+      opposingOdds: Number(other.odds),
+      marketObservedAt: market.observedAt
+    }
   };
-  candidate.qualifies = shouldNotify({ kind: "middle", width, priorKeyExists: priorKeys.has(JSON.stringify([identityBase.ticketId, candidate.opposingTeam, candidate.opposingSpread, candidate.opposingOdds])) });
-  return { eligible: true, candidate };
 }
 
 module.exports = { evaluateTrackedTicket, isFresh };
