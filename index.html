@@ -539,7 +539,7 @@ function record(){
 }
 function lockGame(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Lock this game and stop future recommendations for it?"))return;g.locked=true;g.lockedAt=new Date().toISOString();save()}
 function reopen(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Reopen this game for calculations?"))return;g.locked=false;save()}
-async async function removeGame(id){
+async async async function removeGame(id){
  if(!confirm("Delete this saved record?"))return;
  const old=bets.slice();bets=bets.filter(x=>String(x.id)!==String(id));
  localStorage.setItem("nfltracker",JSON.stringify(bets));render();
