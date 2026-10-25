@@ -62,6 +62,13 @@ IMPORT THIS BROWSER'S SAVED RECORDS</button>
 </section>
 
 <section class="card">
+<h2>Muted games</h2>
+<p class="muted">Muted games suppress future monitoring alerts for the matching ESPN event ID. Unmute any game below to restore eligibility.</p>
+<button class="secondary" id="refreshMuted" type="button">REFRESH MUTED GAMES</button>
+<div id="mutedGamesList" aria-live="polite"><p class="muted">Sign in to manage muted games.</p></div>
+</section>
+
+<section class="card">
 <h2>Record history</h2>
 <label for="historyMode">Records to display</label>
 <select id="historyMode"><option value="week" selected>Selected season and week</option><option value="legacy">Unassigned legacy records</option></select>
@@ -172,7 +179,7 @@ async function initAccount(){
    authSession=session;
    setTimeout(()=>syncAuthPanel(event),0);
   });
-  await syncAuthPanel("init");
+  await syncAuthPanel("init");await refreshMutedGames();
  }catch(e){status.textContent="Accounts are not ready yet: "+(e.message||"setup incomplete");}
 }
 function setAuthStatus(msg,good=false){const n=$("authStatus");n.textContent=msg;n.className="status"+(good?" good":"")}
@@ -186,7 +193,12 @@ async function syncAuthPanel(event){
   try{await loadCloudRecords(false)}catch(e){setAuthStatus("Signed in, but cloud records couldn't load: "+e.message)}
  }
 }
-async function muteTrackedGame(gameId){if(!authSession)throw Error("Sign in to mute this game across devices.");if(!gameId)throw Error("This older record has no ESPN event ID. Use a newly logged wager or selected matchup.");await accountRequest("/api/my-notifications/mute-game",{method:"POST",body:JSON.stringify({gameId:String(gameId)})});alert("Game muted. Future alerts for this event will be suppressed once delivery enforcement is active.");}
+async function muteTrackedGame(gameId){if(!authSession)throw Error("Sign in to mute this game across devices.");if(!gameId)throw Error("This older record has no ESPN event ID. Use a newly logged wager or selected matchup.");await accountRequest("/api/my-notifications/mute-game",{method:"POST",body:JSON.stringify({gameId:String(gameId)})});await refreshMutedGames();alert("Game muted. Future monitoring alerts for this event are suppressed.");}
+let mutedEventIds=[];
+async function refreshMutedGames(){const box=$("mutedGamesList");if(!authSession){box.innerHTML='<p class="muted">Sign in to manage muted games.</p>';return}box.innerHTML='<p class="muted">Loading…</p>';try{const data=await accountRequest("/api/my-notifications/muted-games");mutedEventIds=(data.mutedGames||[]).map(x=>String(x.game_id));const names=new Map();for(const rec of bets){if(rec.gameEventId)names.set(String(rec.gameEventId),rec.game||("Event "+rec.gameEventId))}box.innerHTML=mutedEventIds.length?mutedEventIds.map(id=>'<div class="result"><div class="row"><b>'+esc(names.get(id)||("ESPN event "+id))+'</b><button class="secondary" data-action="unmute-event" data-game-id="'+esc(id)+'">UNMUTE</button></div><p class="muted">Event ID: '+esc(id)+'</p></div>').join(""):'<p class="muted">No games are muted.</p>'}catch(e){box.innerHTML='<p class="bad">Could not load muted games: '+esc(e.message)+'</p>'}}
+$("refreshMuted")?.addEventListener("click",refreshMutedGames);
+$("mutedGamesList")?.addEventListener("click",async event=>{const button=event.target.closest('button[data-action="unmute-event"]');if(!button)return;button.disabled=true;try{await accountRequest("/api/my-notifications/mute-game?gameId="+encodeURIComponent(button.dataset.gameId),{method:"DELETE"});await refreshMutedGames()}catch(e){alert("Unable to unmute: "+e.message);button.disabled=false}});
+
 async function accountRequest(path,options={}){
  if(!authSession?.access_token)throw Error("Sign in first.");
  const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",Authorization:"Bearer "+authSession.access_token,...(options.headers||{})}});
