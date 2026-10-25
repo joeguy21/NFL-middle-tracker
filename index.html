@@ -389,13 +389,13 @@ function record(){
 }
 function lockGame(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Lock this game and stop future recommendations for it?"))return;g.locked=true;g.lockedAt=new Date().toISOString();save()}
 function reopen(id){const g=bets.find(x=>x.id===id);if(!g)return;if(!confirm("Reopen this game for calculations?"))return;g.locked=false;save()}
-async function removeGame(id){if(!confirm("Delete this saved browser record?"))return;bets=bets.filter(x=>x.id!==id);localStorage.setItem("nfltracker",JSON.stringify(bets));render();if(ledgerKey()){try{await ledgerRequest("/api/ledger/record?id="+encodeURIComponent(String(id)),{method:"DELETE"});$("ledgerStatus").textContent="Deleted record from cloud ledger."}catch(e){$("ledgerStatus").textContent="Removed locally; cloud deletion failed: "+e.message}}}
+async function removeGame(id){if(!confirm("Delete this saved browser record?"))return;bets=bets.filter(x=>String(x.id)!==String(id));localStorage.setItem("nfltracker",JSON.stringify(bets));render();if(ledgerKey()){try{await ledgerRequest("/api/ledger/record?id="+encodeURIComponent(String(id)),{method:"DELETE"});$("ledgerStatus").textContent="Deleted record from cloud ledger."}catch(e){$("ledgerStatus").textContent="Removed locally; cloud deletion failed: "+e.message}}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
  refreshAnalyzerChoices();
  $("count").textContent=bets.length;$("exposure").textContent=money(bets.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
  const el=$("games");if(!bets.length){el.innerHTML='<p class="muted">No bets recorded yet.</p>';return}
- el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
+ el.innerHTML=bets.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame(&quot;'+esc(g.id)+'&quot;)">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame(&quot;'+esc(g.id)+'&quot;)">Delete saved record</button></div>').join('');
 }
 $("loadGames").addEventListener("click",loadGames);
 $("week").addEventListener("change",loadGames);
@@ -594,10 +594,22 @@ $("logBetButton").addEventListener("click",()=>{
  const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
  const status=$("logBetStatus");
  if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
+ const selectedIndex=$("matchup").value;
+ const scheduled=selectedIndex!==""?scheduleEvents[Number(selectedIndex)]:null;
+ const selectedType=$("type").value;
  const duplicate=bets.some(x=>x.recordType==="ticket"&&x.game.toLowerCase()===game.toLowerCase()&&x.team.toLowerCase()===team.toLowerCase()&&x.book===$("book").value&&Number(x.s)===s&&Number(x.a)===a);
  if(duplicate&&!confirm("This exact wager is already logged. Add another copy anyway?"))return;
- bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,id:Date.now(),loggedAt:new Date().toLocaleString()});
- save();status.innerHTML='<p class="good">Bet logged in My tracked games on this browser.</p>';
+ const ticketId=(globalThis.crypto&&typeof crypto.randomUUID==="function")?crypto.randomUUID():"ticket-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+ const record={
+  recordType:"ticket",id:ticketId,game,team,opp,book:$("book").value,
+  betType:selectedType,a,s,loggedAt:new Date().toISOString(),
+  gameId:scheduled?.id?String(scheduled.id):null,
+  scheduledAway:scheduled?.away||null,scheduledHome:scheduled?.home||null,
+  alertTracking:false,alertPreference:"disabled"
+ };
+ bets.push(record);
+ save();
+ status.innerHTML='<p class="good">Bet logged on this browser. '+(record.gameId?'Scheduled event ID saved.':'No schedule event ID saved; this ticket cannot be registered for alerts until its matchup is verified.')+'</p>';
 });
 
 let latestOdds=[];

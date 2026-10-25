@@ -1,12 +1,31 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {Pool}=require("pg"),PORT=process.env.PORT||10000,API_KEY=process.env.FANLINE_API_KEY,ACCESS=process.env.TRACKER_ACCESS_KEY,DB=process.env.DATABASE_URL,BASE="https://api.fanlinewire.com",ROOT=__dirname;
 const pool=DB?new Pool({connectionString:DB,ssl:process.env.PGSSLMODE==="disable"?false:{rejectUnauthorized:false},max:5}):null;let ready=false;
+const ENROLLMENT_SECRET=process.env.DEVICE_ENROLLMENT_SECRET;
 const send=(r,s,o)=>{r.writeHead(s,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});r.end(JSON.stringify(o))};
 async function schema(){if(!pool)throw Error("Database not configured");if(ready)return;await pool.query("CREATE TABLE IF NOT EXISTS tracker_records(record_id TEXT PRIMARY KEY,record_type TEXT NOT NULL,game_key TEXT NOT NULL,payload JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");ready=true}
 async function readBody(req){let b="";for await(const x of req){b+=x;if(b.length>500000)throw Error("Body too large")}return JSON.parse(b||"{}")}
 function auth(req){let k=req.headers["x-tracker-key"];return !!ACCESS&&typeof k==="string"&&k.length===ACCESS.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(ACCESS))}
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,`http://${req.headers.host||"localhost"}`);
 if(u.pathname==="/api/health")return send(res,200,{ok:true,keyConfigured:!!API_KEY,ledgerConfigured:!!pool&&!!ACCESS});
+if(u.pathname==="/api/device/enroll"){
+ if(req.method!=="POST"){res.setHeader("Allow","POST");return send(res,405,{ok:false,error:"POST required"})}
+ if(!ENROLLMENT_SECRET)return send(res,503,{ok:false,error:"Device enrollment is not configured."});
+ if(!pool)return send(res,503,{ok:false,error:"DATABASE_URL is not configured."});
+ const {createDeviceEnrollmentService}=require("./device-enrollment");
+ try{
+  const presented=req.headers["x-device-enrollment-secret"];
+  if(typeof presented!=="string")return send(res,401,{ok:false,error:"Enrollment authorization failed"});
+  const data=await readBody(req);
+  if(data.platform!==undefined&&data.platform!=="ios"&&data.platform!=="web")return send(res,400,{ok:false,error:"Unsupported platform"});
+  const result=await createDeviceEnrollmentService({pool,enrollmentSecret:ENROLLMENT_SECRET}).enroll(presented,data.platform||"ios");
+  return send(res,result.status,result.body);
+ }catch(e){
+  // Do not log request headers, enrollment secrets, or issued credentials.
+  console.error("device enrollment failed:",e.code||"database operation");
+  return send(res,500,{ok:false,error:"Enrollment failed; confirm the database schema is installed."});
+ }
+}
 if(u.pathname.startsWith("/api/ledger")){
  if(!ACCESS)return send(res,503,{ok:false,error:"TRACKER_ACCESS_KEY must be set in Render."});
  if(!auth(req))return send(res,401,{ok:false,error:"Ledger access key required or incorrect."});

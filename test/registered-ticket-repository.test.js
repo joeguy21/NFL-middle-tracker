@@ -1,0 +1,18 @@
+"use strict";
+const test=require("node:test"),assert=require("node:assert/strict");
+const {createRegisteredTicketRepository}=require("../registered-ticket-repository");
+const ticket={recordType:"ticket",id:"t-1",betType:"moneyline",gameId:"evt",team:"New Orleans Saints",opp:"Pittsburgh Steelers",a:134,s:100,book:"FanDuel"};
+function fakePool(prior=null){const calls=[];return {calls,async connect(){return {async query(sql,args){calls.push({sql,args});if(sql.startsWith("SELECT ticket_snapshot"))return {rows:prior?[{ticket_snapshot:prior}]:[]};return {rows:[],rowCount:1}},release(){}}}}}
+const record={id:"t-1",gameId:"evt",marketType:"moneyline",team:"NO",opp:"PIT",spread:null,odds:134,stake:100,book:"FanDuel"};
+test("stores new ticket transactionally using authenticated principal scope",async()=>{const p=fakePool(),repo=createRegisteredTicketRepository(p);const r=await repo.register("principal-A",record,ticket);assert.deepEqual(r,{ok:true,action:"inserted"});assert.equal(p.calls[0].sql,"BEGIN");const insert=p.calls.find(x=>x.sql.includes("INSERT INTO registered_tickets"));assert.ok(insert);assert.equal(insert.args[0],"principal-A");assert.equal(insert.args[1],"t-1");assert.equal(p.calls.at(-1).sql,"COMMIT")});
+test("identical retry is no-op and doesn't insert",async()=>{const p=fakePool(ticket),repo=createRegisteredTicketRepository(p);assert.deepEqual(await repo.register("principal-A",record,ticket),{ok:true,action:"no-op"});assert.equal(p.calls.some(x=>x.sql.includes("INSERT INTO registered_tickets")),false)});
+test("changed accepted wager conflicts",async()=>{const p=fakePool(ticket),repo=createRegisteredTicketRepository(p);const changed={...ticket,a:125};assert.deepEqual(await repo.register("principal-A",record,changed),{ok:false,action:"conflict",reason:"accepted-ticket-changed"});assert.equal(p.calls.some(x=>x.sql.includes("INSERT INTO registered_tickets")),false)});
+test("requires an authenticated owner and validated record",async()=>{const repo=createRegisteredTicketRepository(fakePool());await assert.rejects(repo.register("",record,ticket),TypeError);await assert.rejects(repo.register("p",null,ticket),TypeError)});
+
+const {ticketFingerprint}=require("../ticket-registration");
+test("ticket fingerprint normalizes current browser aliases",()=>{
+ const normalized={...ticket,odds:134,stake:100};
+ assert.equal(ticketFingerprint(ticket),ticketFingerprint(normalized));
+ assert.notEqual(ticketFingerprint(ticket),ticketFingerprint({...ticket,a:125}));
+ assert.notEqual(ticketFingerprint(ticket),ticketFingerprint({...ticket,s:110}));
+});
