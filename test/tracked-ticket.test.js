@@ -17,6 +17,10 @@ test("rejects moneyline even when ticket otherwise looks valid",()=>{
   const t=good();t.betType="moneyline";
   assert.equal(validateTrackedTicket(t).reason,"spread-ticket-required");
 });
+test("rejects conflicting market type declarations",()=>{
+  const t=good();t.marketType="moneyline";
+  assert.equal(validateTrackedTicket(t).reason,"spread-ticket-required");
+});
 test("rejects ticket without affirmative opt-in",()=>{
   const t=good();t.alertTracking=false;
   assert.equal(validateTrackedTicket(t).reason,"tracking-not-opted-in");
