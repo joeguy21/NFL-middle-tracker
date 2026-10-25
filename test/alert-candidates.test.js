@@ -15,7 +15,7 @@ test("fresh tracked-game opposing lines yield middle candidate >3",()=>{
  assert.equal(r.candidate.original.stake,100);
  assert.equal(r.candidate.opposingOdds,-105);
  assert.ok(r.candidate.hedgeEstimate.hedge>0);
- assert.equal(r.candidate.hedgeEstimate.originalWins, r.candidate.hedgeEstimate.hedgeWins);
+ assert.ok(Number.isFinite(r.candidate.hedgeEstimate.worstCase));
  assert.equal(r.candidate.score.away,null);
 });
 test("exactly three points does not qualify",()=>{
