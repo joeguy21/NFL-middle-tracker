@@ -211,6 +211,17 @@ async function initAccount(){
  }
 }
 function setAuthStatus(msg,good=false){const n=byId("authStatus");n.textContent=msg;n.className="status"+(good?" good":"")}
+/* Show safe, actionable auth diagnostics without exposing credentials or entered email. */
+function authFailureMessage(operation,error){
+ const name=String(error?.name||"Error");
+ const message=String(error?.message||error||"Unknown error");
+ const status=error?.status?(" HTTP "+error.status):"";
+ const code=error?.code?(" ["+String(error.code)+"]"):"";
+ if(name==="TypeError"&&/load failed|fetch|network/i.test(message)){
+  return operation+" could not complete: browser network request failed ("+name+": "+message+"). The app is initialized, but Safari did not provide an HTTP response. Check connection/content blockers, then try once in Safari with content blockers/VPN temporarily off. If it repeats, send this exact message.";
+ }
+ return operation+" failed: "+message+status+code+" ("+name+").";
+}
 async function syncAuthPanel(event){
  const yes=!!authSession;
  byId("authSignedOut").hidden=yes;byId("authSignedIn").hidden=!yes;
@@ -274,7 +285,7 @@ byId("authSignIn").addEventListener("click",async()=>{
  if(!email||!password)return setAuthStatus("Enter your email and password.");
  byId("authSignIn").disabled=true;
  try{const {error}=await authClient.auth.signInWithPassword({email,password});if(error)throw error;setAuthStatus("Signed in.",true)}
- catch(e){setAuthStatus(e.message||"Sign-in failed.")}
+ catch(e){setAuthStatus(authFailureMessage("Sign-in",e))}
  finally{byId("authSignIn").disabled=false}
 });
 byId("authSignUp").addEventListener("click",async()=>{
@@ -288,7 +299,7 @@ byId("authSignUp").addEventListener("click",async()=>{
   if(error)throw error;
   if(data.session)setAuthStatus("Account created and signed in.",true);
   else setAuthStatus("Account created. Check your email to confirm, then return here and sign in.",true);
- }catch(e){setAuthStatus(e.message||"Account creation failed.")}
+ }catch(e){setAuthStatus(authFailureMessage("Account creation",e))}
  finally{byId("authSignUp").disabled=false}
 });
 byId("authSignOut").addEventListener("click",async()=>{
