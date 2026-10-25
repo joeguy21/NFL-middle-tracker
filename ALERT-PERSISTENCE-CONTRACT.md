@@ -35,3 +35,11 @@ Status: schema proposal only. Migration `001-tracked-alerts.sql` is committed to
 
 ## Release gate
 Add migration integration tests against a disposable PostgreSQL instance; implement authorization and event resolution before exposing registration routes. Do not apply this migration to test or production DB until reviewed and explicitly approved.
+
+
+## Device authentication boundary (implemented utility; not yet wired to routes)
+- `device-auth.js` accepts only one syntactically valid opaque Bearer token and hashes it before asking the repository for a lookup.
+- Repository contract: `findActiveDeviceByCredentialHash(hash)` must use a parameterized query joining device and principal records, excluding revoked devices and disabled principals. Return only the server-owned `deviceId` and `principalId`, or null.
+- Authenticated identity is derived exclusively from that lookup. Callers must not submit an owner ID to select records.
+- Authentication helper and tests are pure and isolated. This is not yet an HTTP middleware integration or a credential enrollment/revocation system.
+- Do not provision users or enable endpoints until a separately authenticated, auditable enrollment process exists. No self-service principal creation based on an unauthenticated request.
