@@ -167,20 +167,33 @@ let bets=JSON.parse(localStorage.getItem("nfltracker")||"[]");
 let authClient=null,authSession=null,cloudSyncBusy=false,cloudSyncTimer=null;
 async function initAccount(){
  const status=$("authStatus");
+ status.textContent="Connecting to secure account service…";
  try{
   const configResponse=await fetch("/api/auth-config",{cache:"no-store",signal:AbortSignal.timeout(10000)});
   const config=await configResponse.json();
   if(!configResponse.ok||!config.url||!config.publishableKey)throw Error(config.error||"Account sign-in is not configured yet.");
-  if(!window.supabase?.createClient)throw Error("Secure sign-in library did not load. Refresh and retry.");
-  authClient=window.supabase.createClient(config.url,config.publishableKey);
-  const {data,error}=await authClient.auth.getSession();if(error)throw error;
-  authSession=data.session;
+  if(!window.supabase?.createClient)throw Error("Secure sign-in library did not load. Check connection/content blockers, then reload.");
+  authClient=window.supabase.createClient(config.url,config.publishableKey,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  // Supabase storage/session initialization can hang in some mobile webviews.
+  // Bound the wait so the account controls never remain silently stuck.
+  const sessionResult=await Promise.race([
+   authClient.auth.getSession(),
+   new Promise((_,reject)=>setTimeout(()=>reject(Error("Secure sign-in is taking too long. Try Reload; if it repeats, open this site in Safari.")),8000))
+  ]);
+  if(sessionResult.error)throw sessionResult.error;
+  authSession=sessionResult.data.session;
   authClient.auth.onAuthStateChange((event,session)=>{
    authSession=session;
    setTimeout(()=>syncAuthPanel(event),0);
   });
-  await syncAuthPanel("init");await refreshMutedGames();
- }catch(e){status.textContent="Accounts are not ready yet: "+(e.message||"setup incomplete");}
+  await syncAuthPanel("init");
+  refreshMutedGames().catch(e=>console.warn("Muted-game refresh:",e));
+ }catch(e){
+  status.textContent="Account connection issue: "+(e.message||"setup incomplete")+". Your saved browser records have not been changed.";
+  status.className="status bad";
+ }
 }
 function setAuthStatus(msg,good=false){const n=$("authStatus");n.textContent=msg;n.className="status"+(good?" good":"")}
 async function syncAuthPanel(event){
