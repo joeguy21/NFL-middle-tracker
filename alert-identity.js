@@ -18,8 +18,8 @@ function alertKey({ userId, ticketId, gameId, kind, milestone = null, opportunit
   return keyParts.map(x => encodeURIComponent(x)).join(":");
 }
 
-function shouldNotify({ kind, width, milestone, priorKeyExists = false }) {
-  if (priorKeyExists) return false;
+function shouldNotify({ kind, width, milestone, priorKeyExists = false, gameMuted = false }) {
+  if (priorKeyExists || gameMuted) return false;
   if (kind === "middle") return Number.isFinite(Number(width)) && Number(width) > 3;
   if (kind === "hedge") return ["Q1", "Q2", "Q3"].includes(milestone);
   return false;
