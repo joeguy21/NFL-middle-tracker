@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { normalizeScoreboard, quarterMilestone } = require("../game-state");
+const { normalizeScoreboard, quarterMilestone, quarterTransition } = require("../game-state");
 
 const sample = {
   events: [{
@@ -46,4 +46,20 @@ test("does not claim a score is valid when a competitor score is missing", () =>
 test("ignores malformed or nameless events", () => {
   assert.deepEqual(normalizeScoreboard({ events: [{ id: "no teams" }, null] }), []);
   assert.deepEqual(normalizeScoreboard(null), []);
+});
+
+
+test("detects a quarter transition even when polling misses exact 0:00", () => {
+ const [live] = normalizeScoreboard(sample);
+ assert.equal(quarterTransition({ ...live, period: 1, clock: "0:12" }, { ...live, period: 2, clock: "15:00" }), "Q1");
+ assert.equal(quarterTransition({ ...live, period: 2 }, { ...live, period: 3 }), "Q2");
+ assert.equal(quarterTransition({ ...live, period: 3 }, { ...live, period: 4 }), "Q3");
+});
+
+test("does not infer quarter completion across gaps or game identities", () => {
+ const [live] = normalizeScoreboard(sample);
+ assert.equal(quarterTransition({ ...live, period: 1 }, { ...live, period: 3 }), null);
+ assert.equal(quarterTransition({ ...live, id: "other", period: 1 }, { ...live, period: 2 }), null);
+ assert.equal(quarterTransition({ ...live, period: 3 }, { ...live, period: 4, completed: true }), null);
+ assert.equal(quarterTransition({ ...live, period: 1, state: "pre" }, { ...live, period: 2 }), null);
 });
