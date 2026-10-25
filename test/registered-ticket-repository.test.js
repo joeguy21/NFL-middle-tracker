@@ -8,3 +8,11 @@ test("stores new ticket transactionally using authenticated principal scope",asy
 test("identical retry is no-op and doesn't insert",async()=>{const p=fakePool(ticket),repo=createRegisteredTicketRepository(p);assert.deepEqual(await repo.register("principal-A",record,ticket),{ok:true,action:"no-op"});assert.equal(p.calls.some(x=>x.sql.includes("INSERT INTO registered_tickets")),false)});
 test("changed accepted wager conflicts",async()=>{const p=fakePool(ticket),repo=createRegisteredTicketRepository(p);const changed={...ticket,a:125};assert.deepEqual(await repo.register("principal-A",record,changed),{ok:false,action:"conflict",reason:"accepted-ticket-changed"});assert.equal(p.calls.some(x=>x.sql.includes("INSERT INTO registered_tickets")),false)});
 test("requires an authenticated owner and validated record",async()=>{const repo=createRegisteredTicketRepository(fakePool());await assert.rejects(repo.register("",record,ticket),TypeError);await assert.rejects(repo.register("p",null,ticket),TypeError)});
+
+const {ticketFingerprint}=require("../ticket-registration");
+test("ticket fingerprint normalizes current browser aliases",()=>{
+ const normalized={...ticket,odds:134,stake:100};
+ assert.equal(ticketFingerprint(ticket),ticketFingerprint(normalized));
+ assert.notEqual(ticketFingerprint(ticket),ticketFingerprint({...ticket,a:125}));
+ assert.notEqual(ticketFingerprint(ticket),ticketFingerprint({...ticket,s:110}));
+});
