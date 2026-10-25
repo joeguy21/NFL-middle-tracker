@@ -244,16 +244,35 @@ $("authSignOut").addEventListener("click",async()=>{
 });
 $("cloudLoad").addEventListener("click",async()=>{try{await loadCloudRecords(true)}catch(e){setAuthStatus("Cloud load failed: "+e.message)}});
 $("cloudImport").addEventListener("click",importBrowserRecords);
+let cloudSyncRevision=0;
 function queueCloudSync(){
- if(!authSession||cloudSyncBusy)return;
+ if(!authSession)return;
+ cloudSyncRevision++;
  clearTimeout(cloudSyncTimer);
- cloudSyncTimer=setTimeout(async()=>{
-  if(!authSession||cloudSyncBusy)return;
-  cloudSyncBusy=true;
-  try{const n=await uploadAccountRecords(bets);setAuthStatus("Saved locally and synced "+n+" record(s) to your private account.",true)}
-  catch(e){setAuthStatus("Saved in this browser; cloud sync failed: "+e.message)}
-  finally{cloudSyncBusy=false}
- },900);
+ cloudSyncTimer=setTimeout(runCloudSync,900);
+}
+async function runCloudSync(){
+ if(!authSession)return;
+ if(cloudSyncBusy){clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(runCloudSync,500);return}
+ cloudSyncBusy=true;
+ const revisionAtStart=cloudSyncRevision;
+ const sessionUser=authSession.user.id;
+ const snapshot=JSON.parse(JSON.stringify(bets));
+ try{
+  const n=await uploadAccountRecords(snapshot);
+  if(authSession&&authSession.user.id===sessionUser&&revisionAtStart===cloudSyncRevision){
+   setAuthStatus("Saved locally and synced "+n+" record(s) to your private account.",true);
+  }else if(authSession&&authSession.user.id===sessionUser){
+   clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(runCloudSync,100);
+  }
+ }catch(e){
+  if(authSession&&authSession.user.id===sessionUser)setAuthStatus("Saved in this browser; cloud sync failed: "+e.message);
+ }finally{
+  cloudSyncBusy=false;
+  if(authSession&&authSession.user.id===sessionUser&&revisionAtStart!==cloudSyncRevision){
+   clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(runCloudSync,100);
+  }
+ }
 }
 
 let pending=null, scheduleEvents=[];
