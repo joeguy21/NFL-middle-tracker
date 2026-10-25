@@ -4,6 +4,7 @@
 // ticket and a single, normalized full-game spread market snapshot by caller.
 // This module never fetches data, sends notifications, or places wagers.
 const { middleWindow } = require("./middle-rules");
+const { equalReturnHedge } = require("./bet-math");
 
 function isFresh(snapshot, nowMs, maxAgeMs) {
   const stamp = Date.parse(snapshot?.observedAt || "");
@@ -49,17 +50,44 @@ function evaluateTrackedTicket({ ticket, market, game, nowMs = Date.now(), maxAg
     firstTeam: ticket.team, firstSpread: Number(ticket.spread),
     secondTeam: other.team, secondSpread: Number(other.spread)
   }).width;
+  let hedgeEstimate = null;
+  try {
+    // Comparison aid only; this does not recommend or place a wager.
+    hedgeEstimate = equalReturnHedge({
+      stake: Number(ticket.stake),
+      originalOdds: Number(ticket.odds),
+      hedgeOdds: Number(other.odds)
+    });
+  } catch (_) {
+    hedgeEstimate = null;
+  }
   return {
     eligible: true,
     candidate: {
-      type: "middle",
+      type: width > 3 ? "middle" : "hedge",
       width,
       qualifies: width > 3,
       originalTicketId: String(ticket.id),
       gameId: String(game.id),
+      matchup: String(game.name || ""),
+      score: {
+        awayTeam: game.away?.name || null,
+        away: finite(game.away?.score) ? Number(game.away.score) : null,
+        homeTeam: game.home?.name || null,
+        home: finite(game.home?.score) ? Number(game.home.score) : null
+      },
+      period: finite(game.period) ? Number(game.period) : null,
+      clock: game.clock == null ? null : String(game.clock),
+      original: {
+        team: String(ticket.team),
+        spread: Number(ticket.spread),
+        odds: Number(ticket.odds),
+        stake: Number(ticket.stake)
+      },
       opposingTeam: String(other.team),
       opposingSpread: Number(other.spread),
       opposingOdds: Number(other.odds),
+      hedgeEstimate,
       marketObservedAt: market.observedAt
     }
   };
