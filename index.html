@@ -201,7 +201,7 @@ async function uploadAccountRecords(records){
 }
 async function importBrowserRecords(){
  if(!authSession)return;
- const local=JSON.parse(localStorage.getItem("nfltracker")||"[]");
+ const backupKey="nfltracker_backup_"+authSession.user.id; const local=JSON.parse(localStorage.getItem(backupKey)||localStorage.getItem("nfltracker")||"[]");
  if(!local.length){setAuthStatus("There are no browser records to import.");return}
  if(!confirm("Import "+local.length+" records from THIS browser into "+authSession.user.email+"? Continue only if these records belong to you."))return;
  try{
