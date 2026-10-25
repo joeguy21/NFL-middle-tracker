@@ -10,7 +10,9 @@ function validateTrackedTicket(ticket) {
   if (ticket.recordType !== "ticket") return { ok:false, reason:"not-a-ticket" };
   if (typeof ticket.id !== "string" || !ticket.id.trim() || ticket.id.length > 160)
     return { ok:false, reason:"invalid-ticket-id" };
-  if (ticket.betType !== "spread" && ticket.marketType !== "spread")
+  const hasType = ticket.betType != null || ticket.marketType != null;
+  if (!hasType || (ticket.betType != null && ticket.betType !== "spread") ||
+      (ticket.marketType != null && ticket.marketType !== "spread"))
     return { ok:false, reason:"spread-ticket-required" };
   const team = teamCode(ticket.team), opp = teamCode(ticket.opp);
   if (!team || !opp || team === opp) return { ok:false, reason:"invalid-team-pair" };
