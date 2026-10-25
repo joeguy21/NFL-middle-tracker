@@ -1,0 +1,62 @@
+name: Alert schema integration
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/main-alerts-foundation
+permissions:
+  contents: read
+jobs:
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nfl-middle-tracker-test-db
+          POSTGRES_USER: tracker_test
+          POSTGRES_PASSWORD: local-ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracker_test -d nfl-middle-tracker-test-db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://tracker_test:local-ci-only-password@localhost:5432/nfl-middle-tracker-test-db
+      PGSSLMODE: disable
+      ALERT_MIGRATION_CONFIRM_DB: nfl-middle-tracker-test-db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Apply migrations to disposable PostgreSQL
+        run: npm run db:migrate:alerts
+      - name: Verify migrations are repeatable
+        run: npm run db:migrate:alerts
+      - name: Verify migration ledger and schema
+        run: |
+          node - <<'NODE'
+          const { Pool } = require("pg");
+          (async () => {
+            const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+            try {
+              const db = await pool.query("SELECT current_database() AS name");
+              if (db.rows[0].name !== "nfl-middle-tracker-test-db") throw new Error("Unexpected test database");
+              const migrations = await pool.query("SELECT migration_id FROM alert_schema_migrations ORDER BY migration_id");
+              const expected = ["001-tracked-alerts.sql", "002-registered-tickets.sql"];
+              if (JSON.stringify(migrations.rows.map(x => x.migration_id)) !== JSON.stringify(expected)) throw new Error("Migration ledger mismatch");
+              const tables = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
+              const names = new Set(tables.rows.map(x => x.table_name));
+              for (const name of ["alert_principals", "alert_devices", "alert_outbox", "registered_tickets", "alert_schema_migrations"]) {
+                if (!names.has(name)) throw new Error("Missing required table: " + name);
+              }
+              console.log("PostgreSQL migration integration verified.");
+            } finally {
+              await pool.end();
+            }
+          })().catch(error => { console.error(error.message); process.exitCode = 1; });
+          NODE
