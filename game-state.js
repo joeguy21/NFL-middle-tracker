@@ -35,6 +35,14 @@ function normalizeScoreboard(payload) {
   }).filter(g => g.id && g.away.name && g.home.name);
 }
 
+function quarterTransition(previous, current) {
+  if (!previous || !current || previous.id !== current.id) return null;
+  if (previous.state !== "in" || current.state !== "in" || current.completed) return null;
+  const before = Number(previous.period), after = Number(current.period);
+  if (![1, 2, 3].includes(before) || after !== before + 1) return null;
+  return "Q" + before;
+}
+
 function quarterMilestone(game) {
   if (!game || game.completed || game.state !== "in") return null;
   const period = Number(game.period);
@@ -43,4 +51,4 @@ function quarterMilestone(game) {
   return "Q" + period;
 }
 
-module.exports = { normalizeScoreboard, quarterMilestone };
+module.exports = { normalizeScoreboard, quarterMilestone, quarterTransition };
