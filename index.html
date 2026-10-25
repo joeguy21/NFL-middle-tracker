@@ -594,10 +594,22 @@ $("logBetButton").addEventListener("click",()=>{
  const a=Number($("odds").value),s=Number($("stake").value),d=dec(a);
  const status=$("logBetStatus");
  if(!game||!team||!opp||!d||!Number.isFinite(s)||s<=0){status.innerHTML='<p class="bad">Choose a game and team, verify your accepted American odds, and enter your actual stake first.</p>';return}
+ const selectedIndex=$("matchup").value;
+ const scheduled=selectedIndex!==""?scheduleEvents[Number(selectedIndex)]:null;
+ const selectedType=$("type").value;
  const duplicate=bets.some(x=>x.recordType==="ticket"&&x.game.toLowerCase()===game.toLowerCase()&&x.team.toLowerCase()===team.toLowerCase()&&x.book===$("book").value&&Number(x.s)===s&&Number(x.a)===a);
  if(duplicate&&!confirm("This exact wager is already logged. Add another copy anyway?"))return;
- bets.push({recordType:"ticket",game,team,opp,book:$("book").value,a,s,id:Date.now(),loggedAt:new Date().toLocaleString()});
- save();status.innerHTML='<p class="good">Bet logged in My tracked games on this browser.</p>';
+ const ticketId=(globalThis.crypto&&typeof crypto.randomUUID==="function")?crypto.randomUUID():"ticket-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+ const record={
+  recordType:"ticket",id:ticketId,game,team,opp,book:$("book").value,
+  betType:selectedType,a,s,loggedAt:new Date().toISOString(),
+  gameId:scheduled?.id?String(scheduled.id):null,
+  scheduledAway:scheduled?.away||null,scheduledHome:scheduled?.home||null,
+  alertTracking:false,alertPreference:"disabled"
+ };
+ bets.push(record);
+ save();
+ status.innerHTML='<p class="good">Bet logged on this browser. '+(record.gameId?'Scheduled event ID saved.':'No schedule event ID saved; this ticket cannot be registered for alerts until its matchup is verified.')+'</p>';
 });
 
 let latestOdds=[];
