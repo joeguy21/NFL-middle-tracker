@@ -61,6 +61,13 @@ footer{color:#8e9cb2;font-size:12px;padding:10px 0 30px;line-height:1.5}
 </section>
 
 <section class="card">
+<h2>Record history</h2>
+<label for="historyMode">Records to display</label>
+<select id="historyMode"><option value="week" selected>Selected season and week</option><option value="legacy">Unassigned legacy records</option></select>
+<p class="muted">Older records without a season/week stay preserved here, separate from weekly totals. Assign them to a week only after reviewing the original record.</p>
+</section>
+
+<section class="card">
 <h2>Choose a game</h2>
 <div class="two">
 <div><label for="week">NFL regular-season week</label>
@@ -285,8 +292,9 @@ const $=id=>document.getElementById(id);
 function dec(a){a=Number(a);if(!a||!Number.isFinite(a))return null;return a>0?1+a/100:1+100/Math.abs(a)}
 function money(n){return Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"})}
 function selectedWeekScope(){return {season:String($("season").value),week:String($("week").value)}}
-function recordInSelectedWeek(r){const scope=selectedWeekScope();return r.season==null||r.week==null||(String(r.season)===scope.season&&String(r.week)===scope.week)}
-function visibleBets(){return bets.filter(recordInSelectedWeek)}
+function recordInSelectedWeek(r){const scope=selectedWeekScope();return r.season!=null&&r.week!=null&&String(r.season)===scope.season&&String(r.week)===scope.week}
+function isLegacyRecord(r){return r.season==null||r.week==null}
+function visibleBets(){return $("historyMode")?.value==="legacy"?bets.filter(isLegacyRecord):bets.filter(recordInSelectedWeek)}
 function save(){localStorage.setItem("nfltracker",JSON.stringify(bets));render();queueCloudSync()}
 
 function teamsFromEvent(ev){
@@ -556,10 +564,11 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function render(){
  const visible=visibleBets();refreshAnalyzerChoices();
  $("count").textContent=visible.length;$("exposure").textContent=money(visible.reduce((n,x)=>n+Number(x.s||0)+Number(x.h||0),0));
- const el=$("games");if(!visible.length){el.innerHTML='<p class="muted">No bets recorded for Week '+esc($("week").value)+', '+esc($("season").value)+'. Bets from other weeks are saved—select their week to view them.</p>';return}
+ const el=$("games");if(!visible.length){el.innerHTML=$("historyMode").value==="legacy"?'<p class="muted">No unassigned legacy records. New records are tagged with the selected season and week.</p>':'<p class="muted">No bets recorded for Week '+esc($("week").value)+', '+esc($("season").value)+'. Other weeks and unassigned legacy records remain saved in their own views.</p>';return}
  el.innerHTML=visible.map(g=>g.recordType==="ticket"?'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="good">BET LOGGED</span></div><p>'+esc(g.team)+' moneyline</p><p class="muted">Actual wager: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Logged: '+esc(g.loggedAt||"")+'</p><button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>':'<div class="result"><div class="row"><b>'+esc(g.game)+'</b><span class="'+(g.locked?'locked':'good')+'">'+(g.locked?'LOCKED':'OPEN')+'</span></div><p>'+esc(g.team)+' vs '+esc(g.opp)+'</p><p class="muted">Original: '+money(g.s)+' @ '+(g.a>0?'+':'')+g.a+' ('+esc(g.book)+')</p><p class="muted">Suggested hedge: '+money(g.h)+' @ '+(g.b>0?'+':'')+g.b+' ('+esc(g.hb)+')</p><p>Worst-case estimate: <b>'+money(g.guaranteed)+'</b></p>'+(g.locked?'<button class="primary" onclick="reopen('+g.id+')">REOPEN GAME</button>':'<button class="lock" onclick="lockGame('+g.id+')">I BET THIS — LOCK GAME</button>')+'<button class="delete" onclick="removeGame('+g.id+')">Delete saved record</button></div>').join('');
 }
 $("loadGames").addEventListener("click",loadGames);
+$("historyMode").addEventListener("change",render);
 $("week").addEventListener("change",()=>{render();loadGames()});
 $("season").addEventListener("change",()=>{render();loadGames()});
 $("matchup").addEventListener("change",()=>{fillTeams();renderOdds();prefillOriginalMoneyline();prefillOpposingMoneyline();});
