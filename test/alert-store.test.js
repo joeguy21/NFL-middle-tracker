@@ -18,5 +18,5 @@ test("delivery status only transitions from pending", async()=>{
  const pool={query:async(sql,args)=>{calls.push({sql,args});return {rowCount:1}}};
  assert.equal(await markAlert(pool,{userId:"u",alertId:"a",status:"sent"}),true);
  assert.match(calls[0].sql,/status='pending'/);
- assert.throws(()=>markAlert(pool,{userId:"u",alertId:"a",status:"pending"}));
+ await assert.rejects(()=>markAlert(pool,{userId:"u",alertId:"a",status:"pending"}),/Invalid alert delivery status/);
 });
