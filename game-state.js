@@ -17,7 +17,7 @@ function normalizeScoreboard(payload) {
     const status = competition?.status || event?.status || {};
     const type = status?.type || {};
     const period = Number(status?.period);
-    const scoreValid = [away, home].every(x => x && Number.isFinite(Number(x.score)));
+    const scoreValid = [away, home].every(x => x && x.score != null && String(x.score).trim() !== "" && Number.isFinite(Number(x.score)));
     const completeTeams = Boolean(away && home && team(away).name && team(home).name);
     return {
       id: String(event?.id || ""),
