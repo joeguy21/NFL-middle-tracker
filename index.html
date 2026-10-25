@@ -168,7 +168,7 @@ let authClient=null,authSession=null,cloudSyncBusy=false,cloudSyncTimer=null;
 async function initAccount(){
  const status=$("authStatus");
  try{
-  const configResponse=await fetch("/api/auth-config",{cache:"no-store"});
+  const configResponse=await fetch("/api/auth-config",{cache:"no-store",signal:AbortSignal.timeout(10000)});
   const config=await configResponse.json();
   if(!configResponse.ok||!config.url||!config.publishableKey)throw Error(config.error||"Account sign-in is not configured yet.");
   if(!window.supabase?.createClient)throw Error("Secure sign-in library did not load. Refresh and retry.");
