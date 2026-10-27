@@ -160,3 +160,19 @@ assert.equal(
   constrained.best.legs.reduce((sum, leg) => sum + leg.stake, 0),
   "Added exposure must count every selected new leg"
 );
+
+
+// Verify a generated middle package settles as expected inside its modeled window.
+const { evaluateMargin } = require("./hedge-calculator");
+const middleMargin = 4; // Between Team A -2.5 and Team B +7.
+const proposedNet = evaluateMargin(middleMargin, [
+  ...originals,
+  ...result.best.legs
+]);
+assert.ok(proposedNet > 0, "A qualifying middle outcome should show positive combined net in this fixture");
+
+// Outside the middle, the package must still produce a finite, computable result.
+for (const margin of [-20, -7, 0, 8, 20]) {
+  const net = evaluateMargin(margin, [...originals, ...result.best.legs]);
+  assert.ok(Number.isFinite(net), `Settlement result must be finite at margin ${margin}`);
+}
