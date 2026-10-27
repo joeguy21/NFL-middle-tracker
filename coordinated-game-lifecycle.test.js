@@ -16,7 +16,7 @@ assert.equal(saved.status,"saved-not-tracking","Start is immutable; does not mut
 assert.equal(startTracking(active).status,"tracking","Repeated activation is idempotent.");
 const stopped=stopTracking(active,{now:"2026-10-29T12:03:00Z"});
 assert.equal(stopped.status,"stopped");
-assert.equal(stopTracking(stopped),undefined,"unreachable");
+assert.throws(()=>stopTracking(stopped),/Only active tracking/);
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0]]}),/valid original wagers/);
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],team:"A"}]}),/valid original wagers/);
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],odds:0}]}),/valid original wagers/);
