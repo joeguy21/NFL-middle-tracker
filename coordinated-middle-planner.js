@@ -56,7 +56,7 @@ function planMiddleFirst({
             originalLegs: [...originalLegs, ...middleLegs],
             candidates: validHedges,
             maxAddedStake: Math.max(0, budget - stakeA - stakeB),
-            maxTotalStake: Math.max(1, maxTotalStake - stakeA - stakeB),
+            maxTotalStake,
             stakeStep
           }).best;
         }
