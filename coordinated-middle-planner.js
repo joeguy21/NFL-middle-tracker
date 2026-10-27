@@ -34,8 +34,16 @@ function planMiddleFirst({
   const maxSteps = Math.floor((budget + 1e-8) / stakeStep);
   const plans = [];
 
+  const sameMarket = (a, b) => {
+    // Missing market identity is not safe enough to combine.
+    const required = ["eventId", "league", "category", "period", "marketType"];
+    if (required.some(k => a[k] == null || b[k] == null || String(a[k]) === "" || String(b[k]) === "")) return false;
+    return required.every(k => String(a[k]).toLowerCase() === String(b[k]).toLowerCase());
+  };
   for (const a of aQuotes) for (const b of bQuotes) {
-    // A and B must be opposite sides of the same spread market.
+    // Both quotes must identify the same event and market context.
+    if (!sameMarket(a, b)) continue;
+    // Team A and B must be opposing sides of the same normalized market.
     const width = Math.round((a.spread + b.spread) * 100) / 100;
     if (width + 1e-8 < minMiddleWidth) continue;
     for (let aStep = 1; aStep <= maxSteps; aStep++) {
@@ -46,7 +54,7 @@ function planMiddleFirst({
           { team: "A", spread: a.spread, odds: a.odds, stake: stakeA, sportsbook: a.sportsbook, quoteId: a.quoteId },
           { team: "B", spread: b.spread, odds: b.odds, stake: stakeB, sportsbook: b.sportsbook, quoteId: b.quoteId }
         ];
-        const middleSummary = summarizePlan(originalLegs, middleLegs);
+        
         let bestHedge = null;
         if (hedgeCandidates.length) {
           const validHedges = eligibleQuotes(hedgeCandidates, originalBooks, options)
