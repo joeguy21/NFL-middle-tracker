@@ -125,3 +125,38 @@ const stale = planMiddleFirst({
   nowMs: 40000, maxQuoteAgeMs: 30000
 });
 assert.equal(stale.best, null, "Stale quotes must not create a package");
+
+const tightCap = planMiddleFirst({
+  originalLegs: originals,
+  quotes,
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3,
+  maxAddedStake: 300,
+  maxTotalStake: 45,
+  stakeStep: 10
+});
+assert.equal(tightCap.best, null, "Planner must not create a package when original stakes leave insufficient room for both legs");
+
+const constrained = planMiddleFirst({
+  originalLegs: originals,
+  quotes,
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3,
+  maxAddedStake: 300,
+  maxTotalStake: 55,
+  stakeStep: 5
+});
+assert.ok(constrained.best, "A feasible package should fit within the remaining exposure");
+assert.ok(constrained.best.middleLegs.length === 2);
+assert.ok(constrained.best.summary.addedStake <= 15, "All proposed middle stakes must fit remaining total exposure");
+assert.ok(constrained.best.summary.totalStaked <= 55, "Original plus every proposed leg must fit max total stake");
+assert.equal(
+  constrained.best.summary.totalOriginalStake,
+  originals.reduce((sum, leg) => sum + leg.stake, 0),
+  "Summary must include both original wagers"
+);
+assert.equal(
+  constrained.best.summary.addedStake,
+  constrained.best.legs.reduce((sum, leg) => sum + leg.stake, 0),
+  "Added exposure must count every selected new leg"
+);
