@@ -10,6 +10,7 @@ function canonicalizeFanLineQuotes(payload, {
   selectedEvent, sportsbook, teamA, teamB, nowMs, maxAgeMs = 30000,
   kickoffToleranceMs = 15 * 60 * 1000
 } = {}) {
+  if (!sportsbook || !String(sportsbook).trim()) return [];
   const signature = eventSignature(selectedEvent);
   if (!signature) throw new Error("Selected game requires league, homeTeam, awayTeam, and valid startTime.");
   const quotes = normalizeFanLineSpreads(payload, {teamA, teamB, sportsbook, nowMs, maxAgeMs});
@@ -25,6 +26,8 @@ function canonicalizeFanLineQuotes(payload, {
       matchingMarkets.set(String(market.market_id || ""), event);
     }
   }
+  // Fail closed if more than one provider market could represent the selected game.
+  if (matchingMarkets.size !== 1) return [];
   const valid = quotes.filter(q => matchingMarkets.has(q.marketId));
   const key = `${signature.league}:${signature.teams.join("|")}:${signature.start}`;
   return valid.map(q => ({
