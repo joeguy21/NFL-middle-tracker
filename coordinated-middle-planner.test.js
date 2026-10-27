@@ -94,3 +94,34 @@ const otherMarket = planMiddleFirst({
   minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
 });
 assert.ok(otherMarket.best, "Provider-specific market IDs may differ when event and market context match");
+
+
+for (const [field, value] of [
+  ["league", "nba"],
+  ["category", "moneyline"],
+  ["period", "first-half"],
+  ["marketType", "MATCH_HANDICAP_(3-WAY)"]
+]) {
+  const mismatch = planMiddleFirst({
+    originalLegs: originals,
+    quotes: [
+      { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
+      { ...context, [field]: value, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
+    ],
+    originalBooks: { A: "FanDuel", B: "DraftKings" },
+    minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
+  });
+  assert.equal(mismatch.best, null, `Quotes with mismatched ${field} must not pair`);
+}
+
+const stale = planMiddleFirst({
+  originalLegs: originals,
+  quotes: [
+    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM", timestampMs: 1000 },
+    { ...context, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel", timestampMs: 1000 }
+  ],
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10,
+  nowMs: 40000, maxQuoteAgeMs: 30000
+});
+assert.equal(stale.best, null, "Stale quotes must not create a package");
