@@ -36,9 +36,9 @@ function planMiddleFirst({
 
   const sameMarket = (a, b) => {
     // Missing market identity is not safe enough to combine.
-    const required = ["eventId", "marketId", "league", "category", "period", "marketType"];
+    const required = ["eventId", "league", "category", "period", "marketType"];
     if (required.some(k => a[k] == null || b[k] == null || String(a[k]) === "" || String(b[k]) === "")) return false;
-    return required.every(k => String(a[k]).toLowerCase() === String(b[k]).toLowerCase());
+    return required.every(k => String(a[k]).trim().toLowerCase() === String(b[k]).trim().toLowerCase());
   };
   for (const a of aQuotes) for (const b of bQuotes) {
     // Both quotes must identify the same event and market context.
