@@ -5,11 +5,12 @@ const originals = [
   { team: "A", spread: -3, odds: 110, stake: 20, sportsbook: "FanDuel" },
   { team: "B", spread: 3, odds: 110, stake: 20, sportsbook: "DraftKings" }
 ];
+const context = { eventId: "event-1", league: "nfl", category: "spread", period: "game", marketType: "MATCH_HANDICAP_(2-WAY)" };
 const quotes = [
-  { team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel", quoteId: "blocked-A" },
-  { team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM", quoteId: "eligible-A" },
-  { team: "B", spread: 7, odds: -110, sportsbook: "DraftKings", quoteId: "blocked-B" },
-  { team: "B", spread: 7, odds: -105, sportsbook: "FanDuel", quoteId: "eligible-B" }
+  { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel", quoteId: "blocked-A" },
+  { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM", quoteId: "eligible-A" },
+  { ...context, team: "B", spread: 7, odds: -110, sportsbook: "DraftKings", quoteId: "blocked-B" },
+  { ...context, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel", quoteId: "eligible-B" }
 ];
 
 const result = planMiddleFirst({
@@ -33,8 +34,8 @@ assert.ok(result.best.summary.totalStaked <= 100);
 const blockedOnly = planMiddleFirst({
   originalLegs: originals,
   quotes: [
-    { team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel" },
-    { team: "B", spread: 7, odds: -110, sportsbook: "FanDuel" }
+    { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel" },
+    { ...context, team: "B", spread: 7, odds: -110, sportsbook: "FanDuel" }
   ],
   originalBooks: { A: "FanDuel", B: "DraftKings" },
   minMiddleWidth: 3,
@@ -48,8 +49,8 @@ assert.equal(blockedOnly.best, null);
 const narrow = planMiddleFirst({
   originalLegs: originals,
   quotes: [
-    { team: "A", spread: -2.5, odds: -110, sportsbook: "BetMGM" },
-    { team: "B", spread: 5, odds: -110, sportsbook: "FanDuel" }
+    { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "BetMGM" },
+    { ...context, team: "B", spread: 5, odds: -110, sportsbook: "FanDuel" }
   ],
   originalBooks: { A: "FanDuel", B: "DraftKings" },
   minMiddleWidth: 3,
@@ -60,3 +61,25 @@ const narrow = planMiddleFirst({
 assert.equal(narrow.best, null);
 
 console.log("coordinated-middle-planner tests passed");
+
+const otherEvent = planMiddleFirst({
+  originalLegs: originals,
+  quotes: [
+    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
+    { ...context, eventId: "event-2", team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
+  ],
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
+});
+assert.equal(otherEvent.best, null, "Quotes from different events must never pair");
+
+const noIdentity = planMiddleFirst({
+  originalLegs: originals,
+  quotes: [
+    { team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
+    { team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
+  ],
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
+});
+assert.equal(noIdentity.best, null, "Quotes without event/market identity must not pair");
