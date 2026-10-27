@@ -23,7 +23,11 @@ assert.equal(normalizeFanLineSpreads(sample, {...opts, nowMs: Date.parse("2026-1
 assert.throws(() => normalizeFanLineSpreads(sample, {teamA:"A",teamB:"B"}), /sportsbook attribution/);
 const mismatched = structuredClone(sample);
 mismatched.markets[0].selections[1].handicap = 3.5;
-assert.equal(normalizeFanLineSpreads(mismatched, opts).length, 2, "The parser preserves provider lines; opposite-side consistency is a downstream market validation.");
+assert.equal(normalizeFanLineSpreads(mismatched, opts).length, 0, "Reject markets with inconsistent opposing spread lines.");
 const closed = structuredClone(sample); closed.markets[0].status = "CLOSED";
 assert.equal(normalizeFanLineSpreads(closed, opts).length, 0);
 console.log("FanLine spread normalizer tests passed");
+
+const quarterMismatch = structuredClone(sample);
+quarterMismatch.markets[0].selections[0].handicap = 3;
+assert.equal(normalizeFanLineSpreads(quarterMismatch, opts).length, 0, "Reject non-opposite full-game spread selections.");
