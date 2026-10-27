@@ -22,4 +22,9 @@ assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],odds:0}]}),/valid original wagers/);
 assert.throws(()=>startTracking({...saved,status:"stopped"}),/Only saved games/);
 assert.throws(()=>stopTracking(saved),/Only active tracking/);
+assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],teamName:"Chicago Bears"}]}),/match a different team/);
+assert.throws(()=>createCoordinatedGame({id:"x",event:{...event,homeTeam:"Carolina Panthers"},legs}),/valid ID and scheduled/);
+assert.throws(()=>createCoordinatedGame({id:"x",event:{...event,league:"mlb"},legs}),/valid ID and scheduled/);
+assert.throws(()=>createCoordinatedGame({id:"x",event:{...event,startTime:"not-a-date"},legs}),/valid ID and scheduled/);
+assert.equal(createCoordinatedGame({id:" x ",event,legs}).id,"x");
 console.log("coordinated game lifecycle tests passed");
