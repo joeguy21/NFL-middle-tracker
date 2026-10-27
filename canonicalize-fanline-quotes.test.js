@@ -23,5 +23,5 @@ assert.equal(canonicalizeFanLineQuotes(payload,{...opts,selectedEvent:{...select
 assert.equal(canonicalizeFanLineQuotes(payload,{...opts,sportsbook:""}).length,0,"Missing attribution rejects upstream at normalization");
 assert.throws(()=>canonicalizeFanLineQuotes(payload,{...opts,selectedEvent:{league:"nfl"}}),/Selected game requires/);
 const ambiguous={markets:[...payload.markets,{...payload.markets[0],market_id:"second",event_id:"other",start_time:"2026-10-30T00:18:00Z"}]};
-assert.equal(canonicalizeFanLineQuotes(ambiguous,opts).length,4,"Distinct matching offers may be retained but must retain provider market identity.");
+assert.equal(canonicalizeFanLineQuotes(ambiguous,opts).length,0,"Ambiguous same-game candidates fail closed rather than binding to either market.");
 console.log("canonical FanLine quote binding tests passed");
