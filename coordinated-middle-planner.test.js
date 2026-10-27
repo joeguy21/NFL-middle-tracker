@@ -83,3 +83,14 @@ const noIdentity = planMiddleFirst({
   minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
 });
 assert.equal(noIdentity.best, null, "Quotes without event/market identity must not pair");
+
+const otherMarket = planMiddleFirst({
+  originalLegs: originals,
+  quotes: [
+    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
+    { ...context, marketId: "market-alt", team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
+  ],
+  originalBooks: { A: "FanDuel", B: "DraftKings" },
+  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
+});
+assert.equal(otherMarket.best, null, "Quotes from different market IDs must not pair");
