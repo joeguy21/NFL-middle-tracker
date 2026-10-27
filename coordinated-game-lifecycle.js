@@ -11,17 +11,24 @@ function validLeg(leg) {
     VALID_BOOKS.has(String(leg.sportsbook||"").trim().toLowerCase());
 }
 function createCoordinatedGame({id,event,legs,createdAt=new Date().toISOString()}={}) {
-  if (!id || !event || !event.league || !event.homeTeam || !event.awayTeam || !event.startTime)
-    throw new Error("Record requires ID and scheduled event details.");
+  if (typeof id!=="string" || !id.trim() || !event ||
+      !["nfl","nba"].includes(String(event.league||"").trim().toLowerCase()) ||
+      typeof event.homeTeam!=="string" || !event.homeTeam.trim() ||
+      typeof event.awayTeam!=="string" || !event.awayTeam.trim() ||
+      event.homeTeam.trim().toLowerCase()===event.awayTeam.trim().toLowerCase() ||
+      !event.startTime || !Number.isFinite(Date.parse(event.startTime)))
+    throw new Error("Record requires a valid ID and scheduled NFL/NBA matchup.");
   if (!Array.isArray(legs)||legs.length!==2||!legs.every(validLeg)||
       new Set(legs.map(x=>x.team)).size!==2)
     throw new Error("Enter valid original wagers for Team A and Team B.");
-  if (legs[0].sportsbook.trim().toLowerCase()===legs[1].sportsbook.trim().toLowerCase())
-    { /* Allowed: the same book can hold both original bets. */ }
+  const scheduled=new Set([event.homeTeam.trim().toLowerCase(),event.awayTeam.trim().toLowerCase()]);
+  if (legs.some(l=>!scheduled.has(l.teamName.trim().toLowerCase())) ||
+      new Set(legs.map(l=>l.teamName.trim().toLowerCase())).size!==2)
+    throw new Error("Each original wager must match a different team in the scheduled game.");
   return {
-    id:String(id),recordType:"coordinated-game",event:{...event},
-    originalLegs:legs.map(l=>({...l})),status:"saved-not-tracking",
-    createdAt,trackingStartedAt:null,stoppedAt:null,acceptedPlanId:null
+    id:id.trim(),recordType:"coordinated-game",event:{...event},
+    originalLegs:legs.map(l=>({...l,teamName:l.teamName.trim(),sportsbook:l.sportsbook.trim()})),
+    status:"saved-not-tracking",createdAt,trackingStartedAt:null,stoppedAt:null,acceptedPlanId:null
   };
 }
 function startTracking(record, {now=new Date().toISOString()}={}) {
