@@ -16,3 +16,13 @@ assert.equal(matchCrossFeedEvent(target, [reverseOrder, {...reverseOrder,eventId
 assert.equal(matchCrossFeedEvent({...target, startTime:"not-a-date"}, [reverseOrder]), null, "Invalid target kickoff fails closed");
 assert.equal(eventSignature({league:"nfl",homeTeam:"A",awayTeam:"B",startTime:"2026-10-30T00:00:00Z"}).teams.length, 2);
 console.log("cross-feed event matcher tests passed");
+
+const aliasMatch = matchCrossFeedEvent(target, [{
+  league:"nfl", homeTeam:"CAR", awayTeam:"GB",
+  startTime:"2026-10-30T00:20:00Z", eventId:"other-provider"
+}]);
+assert.ok(aliasMatch, "Reviewed team abbreviations can match canonical team names");
+assert.equal(matchCrossFeedEvent(target, [{
+  league:"nfl", homeTeam:"NY", awayTeam:"GB",
+  startTime:"2026-10-30T00:20:00Z"
+}]), null, "Unreviewed ambiguous shorthand must not match");
