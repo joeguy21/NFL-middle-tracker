@@ -93,4 +93,4 @@ const otherMarket = planMiddleFirst({
   originalBooks: { A: "FanDuel", B: "DraftKings" },
   minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
 });
-assert.equal(otherMarket.best, null, "Quotes from different market IDs must not pair");
+assert.ok(otherMarket.best, "Provider-specific market IDs may differ when event and market context match");
