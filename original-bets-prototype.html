@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Middle Tracker — Original Bets</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1728;--card:#1a2a40;--field:#0e192a;--line:#40516a;--muted:#b5c1d2;--accent:#48dda0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f7fb;font:16px system-ui,-apple-system,sans-serif}header{padding:26px 20px 20px;border-bottom:5px solid var(--accent);background:#17253a}h1{margin:0;font-size:clamp(24px,5vw,34px)}header p{margin:6px 0 0;color:var(--muted)}main{max-width:860px;margin:24px auto;padding:0 14px 40px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:18px}h2{margin:0 0 16px;font-size:23px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{margin-bottom:13px}label{display:block;color:#d4ddeb;margin-bottom:6px;font-size:14px}input,select{width:100%;padding:13px 12px;border:1px solid #5b6b82;border-radius:10px;background:var(--field);color:white;font:inherit;min-height:49px}input[readonly]{color:#c9d7e9;background:#122036}.team{border:1px solid #425671;border-radius:14px;padding:16px;background:#16263b}.team h3{font-size:19px;margin:0 0 14px}.button{width:100%;padding:15px;border:0;border-radius:11px;font-weight:750;font-size:16px;background:#3bd69b;color:#092318;margin-top:6px}.button.secondary{background:#354762;color:#fff}.note,.status{color:var(--muted);font-size:13px;line-height:1.5}.status{margin:12px 0}.pill{display:inline-block;padding:5px 9px;background:#123f35;color:#83f1c5;border-radius:99px;font-size:12px;font-weight:700;margin-bottom:12px}.summary{padding:12px;border-radius:10px;background:#102137;margin-top:14px}.hidden{display:none}@media(max-width:600px){.grid{grid-template-columns:1fr}.card{padding:16px}main{margin-top:16px}}
+</style></head>
+<body>
+<header><h1>🏈 Middle Tracker</h1><p>Hedge • Middle • Manage Risk</p></header>
+<main>
+<section class="card">
+<span class="pill">ENTRY SCREEN PROTOTYPE</span><h2>1. Choose a game</h2>
+<div class="grid">
+<div class="field"><label for="sport">Sport</label><select id="sport"><option>NFL</option><option>NBA (coming next)</option></select></div>
+<div class="field"><label for="season">Season</label><select id="season"><option>2026</option><option>2025</option></select></div>
+<div class="field"><label for="week">NFL week</label><select id="week"></select></div>
+<div class="field"><label for="game">Matchup</label><select id="game"><option value="">Select a matchup…</option><option value="Pittsburgh Steelers|Cincinnati Bengals">Steelers at Bengals (example)</option><option value="Baltimore Ravens|Cleveland Browns">Ravens at Browns (example)</option><option value="Dallas Cowboys|Philadelphia Eagles">Cowboys at Eagles (example)</option><option value="manual">Enter matchup manually</option></select></div>
+</div>
+<div id="manualTeams" class="grid hidden"><div class="field"><label for="awayManual">Away team</label><input id="awayManual" placeholder="Away team name"></div><div class="field"><label for="homeManual">Home team</label><input id="homeManual" placeholder="Home team name"></div></div>
+<p class="note">Prototype matchup choices are examples, not a verified weekly schedule. The integrated app will load the selected league/week schedule.</p>
+</section>
+<section class="card"><h2>2. Enter both original bets</h2><p class="note">Select the game once. Both teams populate below. Each original wager is entered independently.</p>
+<div class="grid">
+<div class="team"><h3 id="awayTitle">Away team</h3><div class="field"><label for="awaySpread">Spread</label><input id="awaySpread" placeholder="e.g. +3.5" inputmode="decimal"></div><div class="field"><label for="awayOdds">American odds</label><input id="awayOdds" placeholder="e.g. -110" inputmode="numeric"></div><div class="field"><label for="awayStake">Bet amount ($)</label><input id="awayStake" type="number" min="0.01" step=".01" placeholder="Enter stake"></div><div class="field"><label for="awayBook">Sportsbook used</label><select id="awayBook"></select></div></div>
+<div class="team"><h3 id="homeTitle">Home team</h3><div class="field"><label for="homeSpread">Spread</label><input id="homeSpread" placeholder="e.g. -2.5" inputmode="decimal"></div><div class="field"><label for="homeOdds">American odds</label><input id="homeOdds" placeholder="e.g. -110" inputmode="numeric"></div><div class="field"><label for="homeStake">Bet amount ($)</label><input id="homeStake" type="number" min="0.01" step=".01" placeholder="Enter stake"></div><div class="field"><label for="homeBook">Sportsbook used</label><select id="homeBook"></select></div></div>
+</div>
+<div class="summary"><strong>Original wagers</strong><p id="betSummary" class="note">Choose a matchup and enter both wagers to review them here.</p></div>
+<button class="button" id="save">SAVE BOTH BETS</button><p id="status" class="status" aria-live="polite">Demo only: this prototype stores no bets and does not start game tracking.</p>
+</section>
+<section class="card"><h2>3. Next step in the build</h2><p class="note">After saving both wagers in the integrated app, you'll separately activate tracking. The design will then support coordinated hedge, middle, and combined recommendations using selected sportsbooks and team-specific book exclusions.</p><button class="button secondary" id="clear">CLEAR ENTRY</button></section>
+</main>
+<script>
+const $=id=>document.getElementById(id), books=["FanDuel","DraftKings","Hard Rock Bet","BetMGM","Fanatics","BetRivers","Caesars","Polymarket"];
+for(let i=1;i<=18;i++)$("week").add(new Option("Week "+i,String(i)));$("week").value="8";
+for(const id of ["awayBook","homeBook"]){$(id).add(new Option("Select sportsbook…",""));books.forEach(b=>$(id).add(new Option(b,b)));}
+function teams(){const v=$("game").value;if(v==="manual")return [$("awayManual").value.trim(),$("homeManual").value.trim()];if(!v)return ["",""];return v.split("|")}
+function sync(){const manual=$("game").value==="manual";$("manualTeams").classList.toggle("hidden",!manual);const [a,h]=teams();$("awayTitle").textContent=a||"Away team";$("homeTitle").textContent=h||"Home team";summary()}
+function summary(){const [a,h]=teams();const vals=[["away",a],["home",h]].map(([p,t])=>({team:t,line:$(p+"Spread").value.trim(),odds:$(p+"Odds").value.trim(),stake:$(p+"Stake").value,book:$(p+"Book").value}));if(!a||!h){$("betSummary").textContent="Choose a matchup and enter both wagers to review them here.";return} $("betSummary").innerHTML=vals.map(x=>"<b>"+safe(x.team)+"</b>: "+(x.line?safe(x.line):"spread pending")+" spread · "+(x.odds?safe(x.odds):"odds pending")+" · "+(x.stake?"$"+Number(x.stake).toFixed(2):"stake pending")+" · "+(x.book?safe(x.book):"book pending")).join("<br>")}
+function safe(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+$("game").addEventListener("change",sync);["awayManual","homeManual","awaySpread","homeSpread","awayOdds","homeOdds","awayStake","homeStake","awayBook","homeBook"].forEach(id=>$(id).addEventListener("input",sync));
+$("save").addEventListener("click",()=>{const [a,h]=teams();if(!a||!h){$("status").textContent="Choose a matchup and both team names first.";return}for(const p of ["away","home"]){if(!$(p+"Spread").value.trim()||!Number.isFinite(Number($(p+"Odds").value))||Number($(p+"Odds").value)===0||!(Number($(p+"Stake").value)>0)||!$(p+"Book").value){$("status").textContent="Complete each team's spread, American odds, bet amount and sportsbook.";return}}$("status").textContent="Entry looks complete. This prototype does not save or track bets; the integrated workflow will save both wagers together."});
+$("clear").addEventListener("click",()=>{document.querySelectorAll("input").forEach(x=>x.value="");$("game").value="";$("awayBook").value="";$("homeBook").value="";$("status").textContent="Entry cleared.";sync()});sync();
+</script></body></html>
