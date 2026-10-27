@@ -33,6 +33,10 @@ function canonicalizeFanLineQuotes(payload, {
   return valid.map(q => ({
     ...q,
     eventId: key,
+    league: signature.league,
+    category: q.category,
+    period: q.period,
+    marketType: q.marketType,
     scheduledEvent: {
       league: signature.league,
       teams: signature.teams,
