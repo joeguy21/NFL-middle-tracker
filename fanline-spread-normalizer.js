@@ -39,7 +39,7 @@ function normalizeFanLineSpreads(payload, { teamA, teamB, sportsbook, nowMs, max
         marketType: market.market_type
       });
     }
-    if (seen.size !== 2) {
+    if (seen.size !== 2 || quotes[quotes.length - 1].spread !== -quotes[quotes.length - 2].spread) {
       // Drop any partial entries from this market if selection validation failed.
       const id = String(market.market_id || "");
       for (let i = quotes.length - 1; i >= 0; i--) if (quotes[i].marketId === id) quotes.splice(i, 1);
