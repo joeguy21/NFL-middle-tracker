@@ -14,6 +14,8 @@ function normalizeFanLineSpreads(payload,{teamA,teamB,sportsbook,nowMs,maxAgeMs=
   const category=String(first(m,["category","market","market_name","market_type"])||"").toLowerCase();
   const period=String(first(m,["period","market_period"])||"").toLowerCase();
   if(!/(^|\b)nfl(\b|$)|football/.test(league)||!/spread|handicap/.test(category)||!["game","full game","full-game","match"].includes(period))continue;
+  const marketStatus=String(m.status||"").toUpperCase();
+  if(marketStatus&&!["OPEN","ACTIVE","PRE"].includes(marketStatus))continue;
   const eventTeams=[first(m,["away_team","awayTeam"]),first(m,["home_team","homeTeam"])].map(normTeam);
   if(!eventTeams.includes(normTeam(teamA))||!eventTeams.includes(normTeam(teamB)))continue;
   const rawTime=first(m,["updated_at","updatedAt","last_updated","lastUpdated","timestamp"]);
