@@ -28,7 +28,7 @@ function createCoordinatedGame({id,event,legs,minimumMiddlePoints=3,createdAt=ne
       new Set(legs.map(l=>l.teamName.trim().toLowerCase())).size!==2)
     throw new Error("Each original wager must match a different team in the scheduled game.");
   return {
-    id:id.trim(),recordType:"coordinated-game",event:{...event},
+    id:id.trim(),recordType:"coordinated-game",event:{...event},minimumMiddlePoints,
     originalLegs:legs.map(l=>({...l,teamName:l.teamName.trim(),sportsbook:l.sportsbook.trim()})),
     status:"tracking",createdAt,trackingStartedAt:createdAt,stoppedAt:null,acceptedPlanId:null
   };
