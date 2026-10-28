@@ -13,6 +13,26 @@ if(u.pathname.startsWith("/api/ledger")){
  if(!auth(req))return send(res,401,{ok:false,error:"Ledger access key required or incorrect."});
  if(!pool)return send(res,503,{ok:false,error:"DATABASE_URL must be configured with persistent PostgreSQL."});
  try{await schema();
+ const calc=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)\/calculate-now$/);
+ if(req.method==="POST"&&calc){
+  if(!API_KEY)return send(res,503,{ok:false,error:"FANLINE_API_KEY is not configured in Render."});
+  const id=decodeURIComponent(calc[1]);
+  const got=await pool.query("SELECT payload FROM tracker_records WHERE record_id=$1 AND record_type='coordinated-game'",[id]);
+  if(!got.rows[0])return send(res,404,{ok:false,error:"Saved coordinated game not found."});
+  const record=got.rows[0].payload;
+  if(String(record.event?.league||"").toLowerCase()!=="nfl")return send(res,400,{ok:false,error:"Calculate Now currently supports NFL only."});
+  if(record.status!=="tracking")return send(res,409,{ok:false,error:"Start tracking this game before calculating."});
+  let response;
+  try{response=await fetch(BASE+"/v1/nj/markets?league=nfl&category=spread&period=game",{headers:{"x-api-key":API_KEY,Accept:"application/json"},signal:AbortSignal.timeout(15000)});}
+  catch{return send(res,502,{ok:false,error:"Could not reach FanLine for a fresh calculation."})}
+  if(!response.ok)return send(res,502,{ok:false,error:"FanLine returned HTTP "+response.status+"; no plan was calculated."});
+  let payload;try{payload=await response.json()}catch{return send(res,502,{ok:false,error:"FanLine response was not valid JSON."})}
+  try{
+   const {previewCoordinatedPlan}=require("./coordinated-plan-preview");
+   const result=previewCoordinatedPlan({record,payload,nowMs:Date.now(),sportsbook:"FanDuel",maxAddedStake:300,maxTotalStake:500,maxQuoteAgeMs:30000});
+   return send(res,200,{ok:true,calculatedAt:new Date().toISOString(),source:"FanLine / FanDuel only",note:"Quote preview only. Verify the sportsbook app and odds before placing anything.",result});
+  }catch(e){console.warn("calculate now:",e.message);return send(res,422,{ok:false,error:"Could not safely match this game to fresh spread quotes: "+e.message})}
+ }
  if(req.method==="GET"&&u.pathname==="/api/ledger"){let r=await pool.query("SELECT payload FROM tracker_records ORDER BY updated_at");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
  if(req.method==="GET"&&u.pathname==="/api/ledger/coordinated-games"){const r=await pool.query("SELECT payload FROM tracker_records WHERE record_type='coordinated-game' ORDER BY updated_at DESC");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
  if(req.method==="POST"&&u.pathname==="/api/ledger/coordinated-games"){const d=await readBody(req);const record=createCoordinatedGame({id:d.id,event:d.event,legs:d.legs,minimumMiddlePoints:d.minimumMiddlePoints??3});record.game=record.event.awayTeam+" vs "+record.event.homeTeam;const gameKey=record.game.toLowerCase().slice(0,300);const inserted=await pool.query("INSERT INTO tracker_records(record_id,record_type,game_key,payload) VALUES($1,'coordinated-game',$2,$3::jsonb) ON CONFLICT(record_id) DO NOTHING RETURNING record_id",[record.id,gameKey,JSON.stringify(record)]);if(!inserted.rows.length)return send(res,409,{ok:false,error:"That record ID already exists. Use a new ID for a new saved game."});return send(res,201,{ok:true,record})}
