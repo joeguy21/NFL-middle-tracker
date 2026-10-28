@@ -10,7 +10,7 @@ function validLeg(leg) {
     Number.isFinite(leg.stake) && leg.stake>0 &&
     VALID_BOOKS.has(String(leg.sportsbook||"").trim().toLowerCase());
 }
-function createCoordinatedGame({id,event,legs,createdAt=new Date().toISOString()}={}) {
+function createCoordinatedGame({id,event,legs,minimumMiddlePoints=3,createdAt=new Date().toISOString()}={}) {
   if (typeof id!=="string" || !id.trim() || !event ||
       !["nfl","nba"].includes(String(event.league||"").trim().toLowerCase()) ||
       typeof event.homeTeam!=="string" || !event.homeTeam.trim() ||
@@ -18,7 +18,7 @@ function createCoordinatedGame({id,event,legs,createdAt=new Date().toISOString()
       event.homeTeam.trim().toLowerCase()===event.awayTeam.trim().toLowerCase() ||
       !event.startTime || !Number.isFinite(Date.parse(event.startTime)))
     throw new Error("Record requires a valid ID and scheduled NFL/NBA matchup.");
-  if (!Array.isArray(legs)||legs.length!==2||!legs.every(validLeg)||
+  if (!Number.isFinite(minimumMiddlePoints)||minimumMiddlePoints<0||minimumMiddlePoints>20)\n    throw new Error("Minimum middle alert threshold must be between 0 and 20 points.");\n  if (!Array.isArray(legs)||legs.length!==2||!legs.every(validLeg)||
       new Set(legs.map(x=>x.team)).size!==2)
     throw new Error("Enter valid original wagers for Team A and Team B.");
   const scheduled=new Set([event.homeTeam.trim().toLowerCase(),event.awayTeam.trim().toLowerCase()]);
