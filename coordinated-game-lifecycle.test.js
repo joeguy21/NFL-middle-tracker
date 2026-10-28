@@ -8,7 +8,12 @@ const legs=[
 const saved=createCoordinatedGame({id:"g-1",event,legs,createdAt:"2026-10-29T12:00:00Z"});
 assert.equal(saved.status,"tracking","Successful save activates monitoring immediately.");
 assert.equal(saved.trackingStartedAt,saved.createdAt);
-assert.equal(saved.originalLegs.length,2);\nassert.equal(saved.minimumMiddlePoints,3,"Default alert threshold is 3 points.");\nconst customThreshold=createCoordinatedGame({id:"g-custom",event,legs,minimumMiddlePoints:5});\nassert.equal(customThreshold.minimumMiddlePoints,5,"Chosen threshold persists on the saved record.");\nassert.throws(()=>createCoordinatedGame({id:"g-invalid",event,legs,minimumMiddlePoints:-1}),/threshold must be between/);\nassert.throws(()=>createCoordinatedGame({id:"g-invalid",event,legs,minimumMiddlePoints:21}),/threshold must be between/);
+assert.equal(saved.originalLegs.length,2);
+assert.equal(saved.minimumMiddlePoints,3,"Default alert threshold is 3 points.");
+const customThreshold=createCoordinatedGame({id:"g-custom",event,legs,minimumMiddlePoints:5});
+assert.equal(customThreshold.minimumMiddlePoints,5,"Chosen threshold persists on the saved record.");
+assert.throws(()=>createCoordinatedGame({id:"g-invalid",event,legs,minimumMiddlePoints:-1}),/threshold must be between/);
+assert.throws(()=>createCoordinatedGame({id:"g-invalid",event,legs,minimumMiddlePoints:21}),/threshold must be between/);
 const active=startTracking(saved,{now:"2026-10-29T12:01:00Z"});
 assert.equal(active.status,"tracking");
 assert.equal(active.trackingStartedAt,saved.createdAt,"Already active save is idempotent.");
