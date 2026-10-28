@@ -59,7 +59,8 @@ async function captureOdds(){
  try{
   const response=await fetch(BASE+"/v1/board.json",{headers:{"x-api-key":API_KEY,Accept:"application/json"},signal:AbortSignal.timeout(20000)});
   const raw=await response.text();let payload;try{payload=JSON.parse(raw)}catch{payload={raw_text:raw.slice(0,1500000)}}
-  payload=postgresSafeJson(payload);\n  if(!response.ok){await pool.query("INSERT INTO odds_observations(captured_at,payload,request_status,error_text) VALUES($1,$2::jsonb,$3,$4)",[capturedAt,JSON.stringify(payload),response.status,"Provider request failed"]);console.error("Odds source status",response.status);return;}
+  payload=postgresSafeJson(payload);
+  if(!response.ok){await pool.query("INSERT INTO odds_observations(captured_at,payload,request_status,error_text) VALUES($1,$2::jsonb,$3,$4)",[capturedAt,JSON.stringify(payload),response.status,"Provider request failed"]);console.error("Odds source status",response.status);return;}
   const sourceTime=payload&&(payload.updated_at||payload.last_updated||payload.timestamp);
   await pool.query("INSERT INTO odds_observations(captured_at,source_updated_at,payload,request_status) VALUES($1,$2,$3::jsonb,$4)",[capturedAt,sourceTime?new Date(sourceTime):null,JSON.stringify(payload),response.status]);
   console.log(new Date().toISOString(),"Odds snapshot saved; bytes:",Buffer.byteLength(raw));
