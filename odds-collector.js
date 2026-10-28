@@ -57,7 +57,8 @@ function postgresSafeJson(value){
 async function captureOdds(){
  const capturedAt=new Date().toISOString();
  try{
-  const response=await fetch(BASE+"/v1/board.json",{headers:{"x-api-key":API_KEY,Accept:"application/json"},signal:AbortSignal.timeout(20000)});
+  // Use the structured NFL full-game spread endpoint: board.json is a lean all-sports tape without runner handicaps/team labels.
+  const response=await fetch(BASE+"/v1/nj/markets?league=nfl&category=spread&period=game",{headers:{"x-api-key":API_KEY,Accept:"application/json"},signal:AbortSignal.timeout(20000)});
   const raw=await response.text();let payload;try{payload=JSON.parse(raw)}catch{payload={raw_text:raw.slice(0,1500000)}}
   payload=postgresSafeJson(payload);
   if(!response.ok){await pool.query("INSERT INTO odds_observations(captured_at,payload,request_status,error_text) VALUES($1,$2::jsonb,$3,$4)",[capturedAt,JSON.stringify(payload),response.status,"Provider request failed"]);console.error("Odds source status",response.status);return;}
