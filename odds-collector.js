@@ -48,7 +48,7 @@ async function refreshGameStatuses(records){
 }
 function postgresSafeJson(value){
  if(typeof value==="string"){
-  return value.replace(/\\u0000/gi,"�").replace(/[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]/g,"�").replace(/\\u0000/g,"�");
+  return value.replaceAll(String.fromCharCode(0),"�").replace(/[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]/g,"�");
  }
  if(Array.isArray(value))return value.map(postgresSafeJson);
  if(value&&typeof value==="object"){const out={};for(const [k,v] of Object.entries(value))out[postgresSafeJson(k)]=postgresSafeJson(v);return out;}
