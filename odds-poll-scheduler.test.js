@@ -1,0 +1,11 @@
+const assert=require("node:assert/strict");
+const {nextPollDelay,MINUTE_MS,HOUR_MS}=require("./odds-poll-scheduler");
+const now=Date.parse("2026-10-27T12:00:00Z");
+const rec=(status,startTime)=>({recordType:"coordinated-game",status,event:{startTime}});
+assert.equal(nextPollDelay([],now),MINUTE_MS,"No active tracking should pause odds calls and recheck status.");
+assert.equal(nextPollDelay([rec("stopped","2026-10-27T12:00:00Z")],now),MINUTE_MS);
+assert.equal(nextPollDelay([rec("tracking","2026-10-27T16:00:00Z")],now),HOUR_MS,"Far pregame uses hourly cadence.");
+assert.equal(nextPollDelay([rec("tracking","2026-10-27T13:00:00Z")],now),MINUTE_MS,"Inside two hours uses minute cadence.");
+assert.equal(nextPollDelay([rec("tracking","2026-10-27T11:00:00Z")],now),MINUTE_MS,"Past kickoff stays at minute cadence until final-state support.");
+assert.equal(nextPollDelay([rec("tracking","bad")],now),MINUTE_MS,"Unknown timing fails safe to minute.");
+console.log("odds poll scheduler tests passed");
