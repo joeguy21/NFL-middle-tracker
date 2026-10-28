@@ -6,6 +6,9 @@ COPY index.html ./index.html
 COPY coordinated-games.html ./coordinated-games.html
 COPY server.js ./server.js
 COPY coordinated-game-lifecycle.js ./coordinated-game-lifecycle.js
+COPY odds-collector.js ./odds-collector.js
+COPY odds-poll-scheduler.js ./odds-poll-scheduler.js
+COPY game-status.js ./game-status.js
 COPY manifest.webmanifest ./manifest.webmanifest
 COPY apple-touch-icon.png ./apple-touch-icon.png
 COPY jg-icon.svg ./jg-icon.svg
