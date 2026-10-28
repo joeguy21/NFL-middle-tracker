@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node odds-poll-scheduler.test.js && node hedge-calculator.test.js && node hedge-optimizer.test.js && node odds-eligibility.test.js && node coordinated-middle-planner.test.js && node fanline-spread-normalizer.test.js && node cross-feed-event-matcher.test.js && node canonicalize-fanline-quotes.test.js && node coordinated-game-lifecycle.test.js"
+    "test": "node odds-poll-scheduler.test.js && node hedge-calculator.test.js && node hedge-optimizer.test.js && node odds-eligibility.test.js && node coordinated-middle-planner.test.js && node fanline-spread-normalizer.test.js && node cross-feed-event-matcher.test.js && node canonicalize-fanline-quotes.test.js && node coordinated-game-lifecycle.test.js && node game-status.test.js"
   },
   "dependencies": {
     "pg": "^8.16.3"
