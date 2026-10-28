@@ -16,6 +16,11 @@ assert.equal(saved.status,"tracking","Creation immediately activates tracking.")
 assert.equal(startTracking(active).status,"tracking","Repeated activation is idempotent.");
 const stopped=stopTracking(active,{now:"2026-10-29T12:03:00Z"});
 assert.equal(stopped.status,"stopped");
+assert.deepEqual(stopped.originalLegs,active.originalLegs,"Stopping preserves both original wagers, stakes, odds, spreads, and sportsbooks.");
+assert.deepEqual(stopped.event,active.event,"Stopping preserves scheduled event details.");
+assert.equal(stopped.id,active.id,"Stopping preserves the record ID.");
+assert.equal(stopped.trackingStartedAt,active.trackingStartedAt,"Stopping preserves tracking start time.");
+assert.equal(stopped.stoppedAt,"2026-10-29T12:03:00Z","Stopping records the stop timestamp.");
 assert.throws(()=>stopTracking(stopped),/Only active tracking/);
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0]]}),/valid original wagers/);
 assert.throws(()=>createCoordinatedGame({id:"x",event,legs:[legs[0],{...legs[1],team:"A"}]}),/valid original wagers/);
