@@ -1,7 +1,9 @@
-// Status-aware odds collector. Schedule is centralized; odds requests are batched via the provider board.
+// Status-aware odds collector. Odds snapshots are batched through FanLine.
 const {Pool}=require("pg");
 const {nextPollDelay}=require("./odds-poll-scheduler");
+const {matchGameStatus}=require("./game-status");
 const API_KEY=process.env.FANLINE_API_KEY,DB=process.env.DATABASE_URL,BASE="https://api.fanlinewire.com";
+const ESPN="https://site.api.espn.com/apis/site/v2/sports";
 if(!API_KEY||!DB)throw new Error("Set FANLINE_API_KEY and DATABASE_URL.");
 const pool=new Pool({connectionString:DB,ssl:process.env.PGSSLMODE==="disable"?false:{rejectUnauthorized:false},max:2});
 let closing=false,timer=null,busy=false;
@@ -11,7 +13,39 @@ CREATE TABLE IF NOT EXISTS odds_observations(
  source_updated_at TIMESTAMPTZ,source TEXT NOT NULL DEFAULT 'FanLine board',
  league TEXT NOT NULL DEFAULT 'NFL',payload JSONB NOT NULL,request_status INTEGER,error_text TEXT);
 CREATE INDEX IF NOT EXISTS odds_observations_captured_idx ON odds_observations(captured_at);`);}
-async function activeRecords(){const r=await pool.query("SELECT payload FROM tracker_records WHERE record_type='coordinated-game' AND payload->>'status'='tracking'");return r.rows.map(x=>x.payload);}
+async function activeRecords(){const r=await pool.query("SELECT record_id,payload FROM tracker_records WHERE record_type='coordinated-game' AND payload->>'status'='tracking'");return r.rows.map(x=>({id:x.record_id,...x.payload}));}
+function espnPath(league){const v=String(league||"nfl").toLowerCase();if(v==="nfl")return "football/nfl";if(v==="nba")return "basketball/nba";return null;}
+function dateKey(record){const t=Date.parse(record.event?.startTime);return Number.isFinite(t)?new Date(t).toISOString().slice(0,10).replace(/-/g,""):null;}
+async function refreshGameStatuses(records){
+ const now=Date.now(),groups=new Map();
+ for(const record of records){
+  const kickoff=Date.parse(record.event?.startTime);
+  if(!Number.isFinite(kickoff)||kickoff-now>2*60*60*1000)continue;
+  const path=espnPath(record.event?.league),date=dateKey(record);if(!path||!date)continue;
+  const key=path+"|"+date;if(!groups.has(key))groups.set(key,{path,date,records:[]});groups.get(key).records.push(record);
+ }
+ let finalized=0;
+ for(const group of groups.values()){
+  try{
+   const url=ESPN+"/"+group.path+"/scoreboard?dates="+group.date;
+   const response=await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw Error("Scoreboard status "+response.status);
+   const board=await response.json();if(!Array.isArray(board.events))throw Error("Scoreboard response missing events");
+   for(const record of group.records){
+    const status=matchGameStatus(board.events,record);
+    if(status.confirmedFinal){
+     const updated={...record,status:"stopped",stoppedAt:new Date().toISOString(),gameStatus:"final",gameStatusSource:"ESPN scoreboard",gameStatusEventId:status.eventId,gameStatusCheckedAt:new Date().toISOString(),autoStoppedReason:"confirmed-final"};
+     delete updated.record_id;
+     const result=await pool.query("UPDATE tracker_records SET payload=$2::jsonb,updated_at=NOW() WHERE record_id=$1 AND record_type='coordinated-game' AND payload->>'status'='tracking'",[record.id,JSON.stringify(updated)]);
+     if(result.rowCount){finalized++;console.log("Confirmed final; tracking stopped:",record.game||record.id);}
+    }else{
+     console.log("Game status",record.game||record.id,status.status,status.reason||status.sourceStatus||"");
+    }
+   }
+  }catch(err){console.error("Game-status check failed; leaving records tracked:",group.path,group.date,err.message||err);}
+ }
+ return finalized;
+}
 async function captureOdds(){
  const capturedAt=new Date().toISOString();
  try{
@@ -26,9 +60,14 @@ async function captureOdds(){
 async function cycle(){
  if(closing||busy)return;busy=true;let delay=60000;
  try{
-  const records=await activeRecords();
+  let records=await activeRecords();
   if(!records.length){console.log("No tracked games; odds requests paused.");}
-  else{delay=nextPollDelay(records);await captureOdds();const latest=await activeRecords();delay=nextPollDelay(latest);}
+  else{
+   await refreshGameStatuses(records);
+   records=await activeRecords();
+   if(!records.length){console.log("All tracked games are final; odds requests paused.");}
+   else{delay=nextPollDelay(records);await captureOdds();records=await activeRecords();delay=nextPollDelay(records);}
+  }
  }catch(err){console.error("Collector cycle failed:",err.message||err);delay=60000}
  finally{busy=false;if(!closing)timer=setTimeout(cycle,delay);console.log("Next scheduler check in",Math.round(delay/1000),"seconds");}
 }
