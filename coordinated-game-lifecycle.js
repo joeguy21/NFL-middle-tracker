@@ -28,7 +28,7 @@ function createCoordinatedGame({id,event,legs,createdAt=new Date().toISOString()
   return {
     id:id.trim(),recordType:"coordinated-game",event:{...event},
     originalLegs:legs.map(l=>({...l,teamName:l.teamName.trim(),sportsbook:l.sportsbook.trim()})),
-    status:"saved-not-tracking",createdAt,trackingStartedAt:null,stoppedAt:null,acceptedPlanId:null
+    status:"tracking",createdAt,trackingStartedAt:createdAt,stoppedAt:null,acceptedPlanId:null
   };
 }
 function startTracking(record, {now=new Date().toISOString()}={}) {
