@@ -26,6 +26,13 @@ mismatched.markets[0].selections[1].handicap = 3.5;
 assert.equal(normalizeFanLineSpreads(mismatched, opts).length, 0, "Reject markets with inconsistent opposing spread lines.");
 const closed = structuredClone(sample); closed.markets[0].status = "CLOSED";
 assert.equal(normalizeFanLineSpreads(closed, opts).length, 0);
+const pregame = structuredClone(sample);
+pregame.markets[0].status = "PRE";
+pregame.markets[0].market_type = "HANDICAP";
+pregame.markets[0].selections[0].handicap = "3.5";
+pregame.markets[0].selections[1].handicap = "-3.5";
+assert.equal(normalizeFanLineSpreads(pregame, opts).length, 2,
+  "Accept provider PRE status, alternate handicap label, and numeric-string spreads");
 console.log("FanLine spread normalizer tests passed");
 
 const quarterMismatch = structuredClone(sample);
