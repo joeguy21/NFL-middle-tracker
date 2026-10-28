@@ -1,0 +1,11 @@
+const assert=require("node:assert/strict");
+const {middleWidth,inspectMiddleThreshold}=require("./spread-middle-geometry");
+const legs=(a,b)=>[{team:"A",spread:a},{team:"B",spread:b}];
+assert.equal(middleWidth(legs(3.5,-1.5)),2);
+assert.deepEqual(inspectMiddleThreshold(legs(3.5,-1.5),2),{width:2,minimumPoints:2,qualifies:true});
+assert.equal(inspectMiddleThreshold(legs(3.5,-1.5),3).qualifies,false);
+assert.equal(inspectMiddleThreshold(legs(1.5,-1.5),0).qualifies,false,"A zero-width line is not a middle");
+assert.equal(inspectMiddleThreshold(legs(1.5,-3.5),1).width,-2);
+assert.throws(()=>middleWidth([{team:"A",spread:2},{team:"A",spread:-1}]));
+assert.throws(()=>inspectMiddleThreshold(legs(2,-1),-1));
+console.log("spread middle geometry tests passed");
