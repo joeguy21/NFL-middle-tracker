@@ -5,12 +5,22 @@ const { evaluateMargin } = require("./hedge-calculator");
  * This uses the existing integer-margin model and is explicitly provisional:
  * pushes are calculated, but game-specific settlement rules must be verified.
  */
-function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargin = -100, maxMargin = 100) {
+function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargin, maxMargin) {
   if (!Array.isArray(originalLegs) || !originalLegs.length ||
       !Array.isArray(proposedLegs) || !Array.isArray(middleLegs) || middleLegs.length !== 2) {
     throw new Error("Original wagers and a two-leg middle package are required.");
   }
   const allLegs = [...originalLegs, ...proposedLegs];
+  // Include representative tails beyond every line threshold so a high alternate spread
+  // cannot silently fall outside the modeled range. Retain at least +/-100 scenarios.
+  const maxAbsSpread = Math.max(0, ...allLegs.map(leg => Math.abs(leg.spread)),
+    ...middleLegs.map(leg => Math.abs(leg.spread)));
+  const extent = Math.max(100, Math.ceil(maxAbsSpread) + 2);
+  minMargin = minMargin ?? -extent;
+  maxMargin = maxMargin ?? extent;
+  if (!Number.isInteger(minMargin) || !Number.isInteger(maxMargin) || minMargin > maxMargin) {
+    throw new Error("Invalid integer margin range.");
+  }
   const rows = [];
   for (let marginA = minMargin; marginA <= maxMargin; marginA++) {
     const statuses = middleLegs.map(leg => {
@@ -55,7 +65,7 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
     middlePushNet: summarize(middlePushRows),
     pushMargins: middlePushRows.map(x => x.marginA),
     evaluatedMarginRange: { min: minMargin, max: maxMargin, scenarioCount: rows.length },
-    modelingNotice: "Modeled integer margins only. Scenarios cover integer margins from -100 to +100 only. This is not a complete settlement model; confirm alternate-line push handling, overtime/void rules, quote freshness, and all original wagers before betting."
+    modelingNotice: "Modeled integer margins only. Scenarios cover integer margins across the reported range, extended beyond wager thresholds. This is not a complete settlement model; confirm alternate-line push handling, overtime/void rules, quote freshness, and all original wagers before betting."
   };
 }
 module.exports = { summarizeAlertOutcomes };
