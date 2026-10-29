@@ -1,0 +1,13 @@
+const assert=require("node:assert/strict");
+const {buildCoordinatedAlertCandidate}=require("./coordinated-alert-candidate");
+const record={id:"game-1",status:"tracking",minimumMiddlePoints:3,event:{league:"nfl",awayTeam:"A",homeTeam:"B",startTime:"2026-10-30T00:00:00Z"}};
+const middle={middleWidth:4,middleLegs:[{team:"A",spread:5,odds:-110,stake:20,sportsbook:"FanDuel",quoteId:"q1"},{team:"B",spread:-1,odds:-105,stake:20,sportsbook:"FanDuel",quoteId:"q2"}],outcomeSummary:{middleNet:{minNet:10,maxNet:20}}};
+const hedge={originalTeam:"A",originalTeamName:"Team A",originalBook:"DraftKings",originalStake:50,recommendation:{leg:{team:"B",spread:3,odds:-110,stake:35,sportsbook:"FanDuel",quoteId:"h1"},summary:{worstNet:-2}}};
+let candidate=buildCoordinatedAlertCandidate({record,preview:{ok:true,sportsbook:"FanDuel",quoteCount:4,minimumMiddlePoints:3,plan:{bestMiddle:middle,hedgeRecommendation:hedge}}});
+assert.equal(candidate.eligible,true);assert.equal(candidate.middle.width,4);assert.equal(candidate.hedge.originalTeam,"A");assert.ok(candidate.fingerprint);
+assert.equal(buildCoordinatedAlertCandidate({record:{...record,status:"stopped"},preview:{ok:true,plan:{bestMiddle:middle}}}).eligible,false);
+assert.equal(buildCoordinatedAlertCandidate({record,preview:{ok:false}}).reason,"preview-unavailable");
+assert.equal(buildCoordinatedAlertCandidate({record,preview:{ok:true,plan:{bestMiddle:{...middle,middleWidth:2},hedgeRecommendation:null}}}).eligible,false);
+const changed=buildCoordinatedAlertCandidate({record,preview:{ok:true,plan:{bestMiddle:{...middle,middleLegs:middle.middleLegs.map((l,i)=>i?l:{...l,odds:-105})}}}});
+assert.notEqual(candidate.fingerprint,changed.fingerprint,"new price produces a distinct fingerprint");
+console.log("coordinated alert candidate tests passed");
