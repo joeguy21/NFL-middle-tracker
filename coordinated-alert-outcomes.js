@@ -24,6 +24,7 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
   if (!Number.isInteger(minMargin) || !Number.isInteger(maxMargin) || minMargin > maxMargin) {
     throw new Error("Invalid integer margin range.");
   }
+  const middleOnlyLegs = [...originalLegs, ...middleLegs];
   const rows = [];
   for (let marginA = minMargin; marginA <= maxMargin; marginA++) {
     const statuses = middleLegs.map(leg => {
@@ -33,6 +34,7 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
     rows.push({
       marginA,
       net: Math.round(evaluateMargin(marginA, allLegs) * 100) / 100,
+      middleOnlyNet: Math.round(evaluateMargin(marginA, middleOnlyLegs) * 100) / 100,
       middleHit: statuses.every(status => status === "win"),
       pushInMiddle: statuses.includes("push")
     });
@@ -53,6 +55,7 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
   const tiedOutside = outside.filter(x => x.marginA === 0);
   const middlePushRows = rows.filter(x => x.pushInMiddle);
   const worstOutside = outside.length ? Math.min(...outside.map(x => x.net)) : null;
+  const worstMiddleOnlyOutside = outside.length ? Math.min(...outside.map(x => x.middleOnlyNet)) : null;
   return {
     packageExposure: {
       originalStake: Math.round(originalStake * 100) / 100,
@@ -72,6 +75,12 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
     // Backward-compatible legacy field; deprecated because its name overstates what it measures.
     hedgeCostIfMiddleMisses: worstOutside == null ? null : Math.max(0, -worstOutside),
     worstOutsideNet: worstOutside,
+    hedgeComparison: {
+      worstOutsideBeforeHedge: worstMiddleOnlyOutside,
+      worstOutsideWithProposedPackage: worstOutside,
+      modeledWorstCaseImprovement: worstOutside == null || worstMiddleOnlyOutside == null ? null : Math.round((worstOutside - worstMiddleOnlyOutside) * 100) / 100,
+      note: "Compares the middle legs alone against all proposed legs. Positive improvement means the modeled worst outside-middle net improved; this is not a guarantee."
+    },
     middlePushNet: summarize(middlePushRows),
     pushMargins: middlePushRows.map(x => x.marginA),
     evaluatedMarginRange: { min: minMargin, max: maxMargin, scenarioCount: rows.length },
