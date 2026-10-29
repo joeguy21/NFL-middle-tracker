@@ -83,6 +83,30 @@ function planMiddleFirst({
       }
     }
   }
+  // Analyze each saved original ticket independently. These are single-ticket
+  // hedge candidates, not automatically additive: the coordinated budget still
+  // must be checked before combining recommendations.
+  const independentPositions = originalLegs.map(original => {
+    const opposingTeam = original.team === "A" ? "B" : "A";
+    const candidates = eligible.filter(q => q.team === opposingTeam)
+      .map(q => ({team:q.team,spread:q.spread,odds:q.odds,sportsbook:q.sportsbook,quoteId:q.quoteId}));
+    const result = optimizeSingleLegHedges({
+      originalLegs:[original], candidates,
+      maxAddedStake:budget, maxTotalStake,
+      stakeStep
+    });
+    return {
+      originalTeam:original.team,
+      originalTeamName:original.teamName || original.team,
+      originalBook:original.sportsbook,
+      originalStake:original.stake,
+      opposingTeam,
+      bestHedge:result.best,
+      alternatives:result.alternatives,
+      evaluated:result.evaluated,
+      note:"Ticket-level comparison only. Do not add independently optimized stakes together without recomputing the full coordinated package."
+    };
+  });
   plans.sort((x, y) =>
     y.summary.worstNet - x.summary.worstNet ||
     y.middleWidth - x.middleWidth ||
@@ -92,6 +116,7 @@ function planMiddleFirst({
     best: plans[0] || null,
     alternatives: plans.slice(0, 10),
     qualifyingPackages: plans.length,
+    independentPositions,
     eligibleQuoteCount: eligible.length,
     availableAddedBudget: budget,
     warning: "Prototype only: integer-margin scenarios do not cover full settlement outcomes. Revalidate quotes and complete settlement modeling before action."
