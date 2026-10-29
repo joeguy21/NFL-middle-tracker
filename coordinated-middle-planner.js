@@ -54,7 +54,7 @@ function planMiddleFirst({
       // Size hedge on its target ticket first; keep total portfolio math separate.
       const proposed=[middleLeg,...(hedge?[hedge.leg]:[])];
       const summary=summarizePlan(originalLegs,proposed);
-      const outcomeSummary=summarizeAlertOutcomes(originalLegs,proposed,[pairedOriginal,middleLeg]);
+      const outcomeSummary=summarizeAlertOutcomes(originalLegs,proposed,middleLeg,pairedOriginal);
       plans.push({
         middleWidth:width,
         middleLegs:[middleLeg],
