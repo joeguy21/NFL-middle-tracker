@@ -9,6 +9,10 @@ function profitOnAmericanOdds(stake, odds) {
   return odds > 0 ? stake * odds / 100 : stake * 100 / Math.abs(odds);
 }
 function settleSpread(margin, team, spread) {
+  if (!Number.isFinite(spread) || Math.abs(spread * 2 - Math.round(spread * 2)) > 1e-9) {
+    throw new Error("Quarter-point spreads require split-stake settlement and are not supported by this calculator.");
+  }
+  if (!Number.isFinite(margin) || !["A", "B"].includes(team)) throw new Error("Invalid margin or team.");
   const adjusted = team === "A" ? margin + spread : -margin + spread;
   return adjusted > 0 ? "win" : adjusted < 0 ? "loss" : "push";
 }
