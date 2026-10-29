@@ -32,7 +32,7 @@ const outcomes = summarizeAlertOutcomes(
 );
 assert.deepEqual(outcomes.middleNet.margins, [-3,-2,-1,0,1,2,3]);
 assert.equal(outcomes.middleNet.minNet, outcomes.middleNet.maxNet);
-assert.equal(outcomes.evaluatedMarginRange.scenarioCount, 121);
+assert.equal(outcomes.evaluatedMarginRange.scenarioCount, 201);
 assert.ok(outcomes.outsideNet.teamAWin);
 assert.ok(outcomes.outsideNet.teamBWin);
 assert.equal(outcomes.modelingNotice.includes("not a complete settlement model"), true);
