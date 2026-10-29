@@ -16,4 +16,24 @@ const summary = calc.summarizePlan([{team:"A",spread:3.5,stake:100,odds:120}]);
 assert.equal(summary.addedStake, 0);
 assert.equal(summary.totalStaked, 100);
 assert.equal(summary.rows.length, 121);
-console.log("Settlement calculator smoke tests passed.");
+// The user-facing summary must include every wager and identify a true overlap.
+// Opposing +3.5 legs both win only when the final margin is between -3 and +3.
+const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
+const outcomes = summarizeAlertOutcomes(
+  [
+    {team:"A",spread:-7.5,stake:100,odds:-110},
+    {team:"B",spread:-7.5,stake:100,odds:-110}
+  ],
+  [],
+  [
+    {team:"A",spread:3.5,stake:50,odds:-110},
+    {team:"B",spread:3.5,stake:50,odds:-110}
+  ]
+);
+assert.deepEqual(outcomes.middleNet.margins, [-3,-2,-1,0,1,2,3]);
+assert.equal(outcomes.middleNet.minNet, outcomes.middleNet.maxNet);
+assert.equal(outcomes.evaluatedMarginRange.scenarioCount, 121);
+assert.ok(outcomes.outsideNet.teamAWin);
+assert.ok(outcomes.outsideNet.teamBWin);
+assert.equal(outcomes.modelingNotice.includes("not a complete settlement model"), true);
+console.log("Settlement calculator and outcome-summary tests passed.");
