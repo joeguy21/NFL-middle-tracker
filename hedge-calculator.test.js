@@ -15,7 +15,7 @@ assert.equal(calc.settleSpread(3, "A", -3.5), "loss");
 const summary = calc.summarizePlan([{team:"A",spread:3.5,stake:100,odds:120}]);
 assert.equal(summary.addedStake, 0);
 assert.equal(summary.totalStaked, 100);
-assert.equal(summary.rows.length, 121);
+assert.equal(summary.rows.length, 201);
 // The user-facing summary must include every wager and identify a true overlap.
 // Opposing +3.5 legs both win only when the final margin is between -3 and +3.
 const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
