@@ -33,9 +33,9 @@ const noDifferentBook=planMiddleFirst({originalLegs:originals,
 assert.ok(noDifferentBook.best);
 assert.equal(noDifferentBook.hedgeRecommendation,null,"No separate-book hedge should be fabricated");
 const tooNarrow=planMiddleFirst({originalLegs:originals,quotes:[{...ctx,team:"B",spread:5,odds:-105,sportsbook:"Caesars",timestampMs:10000}],
- originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,maxAddedStake:20,maxTotalStake:300,stakeStep:5,nowMs:10000});
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,stakeStep:0.01,nowMs:10000});
 assert.equal(tooNarrow.best,null,"threshold is per request");
 const stale=planMiddleFirst({originalLegs:originals,quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"Caesars",timestampMs:1000}],
- originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,maxAddedStake:20,maxTotalStake:300,stakeStep:5,nowMs:40000});
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,stakeStep:0.01,nowMs:40000});
 assert.equal(stale.best,null,"stale quote not allowed");
 console.log("coordinated-middle-planner tests passed");
