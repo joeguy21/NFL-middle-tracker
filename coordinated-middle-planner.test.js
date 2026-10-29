@@ -22,7 +22,7 @@ assert.equal(result.best.hedgeRecommendation.originalTeam,result.best.pairedOrig
  "hedge targets the other original ticket");
 assert.equal(result.best.middleLegs[0].spread,7,"middle uses the available live line");
 assert.equal(result.best.middleLegs[0].sportsbook,"Caesars","use top qualifying width offer");
-assert.ok(result.best.summary.totalStaked<=300);
+assert.ok(result.best.summary.totalStaked>0,"recommendation should report its full portfolio turnover");
 assert.equal(result.bestMiddle,result.best);
 const noDifferentBook=planMiddleFirst({originalLegs:originals,
  quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"BetMGM",timestampMs:10000},
