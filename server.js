@@ -1,5 +1,5 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
-const {createCoordinatedGame,startTracking,stopTracking}=require("./coordinated-game-lifecycle");
+const {createCoordinatedGame,startTracking,stopTracking,acceptCoordinatedPlan,ignoreCoordinatedAlert}=require("./coordinated-game-lifecycle");
 const {Pool}=require("pg"),PORT=process.env.PORT||10000,API_KEY=process.env.FANLINE_API_KEY,ACCESS=process.env.TRACKER_ACCESS_KEY,DB=process.env.DATABASE_URL,BASE="https://api.fanlinewire.com",ROOT=__dirname;
 const pool=DB?new Pool({connectionString:DB,ssl:process.env.PGSSLMODE==="disable"?false:{rejectUnauthorized:false},max:5}):null;let ready=false;
 const send=(r,s,o)=>{r.writeHead(s,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});r.end(JSON.stringify(o))};
@@ -37,6 +37,20 @@ if(u.pathname.startsWith("/api/ledger")){
  if(req.method==="GET"&&u.pathname==="/api/ledger/coordinated-games"){const r=await pool.query("SELECT payload FROM tracker_records WHERE record_type='coordinated-game' ORDER BY updated_at DESC");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
  if(req.method==="POST"&&u.pathname==="/api/ledger/coordinated-games"){const d=await readBody(req);const record=createCoordinatedGame({id:d.id,event:d.event,legs:d.legs,minimumMiddlePoints:d.minimumMiddlePoints??3});record.game=record.event.awayTeam+" vs "+record.event.homeTeam;const gameKey=record.game.toLowerCase().slice(0,300);const inserted=await pool.query("INSERT INTO tracker_records(record_id,record_type,game_key,payload) VALUES($1,'coordinated-game',$2,$3::jsonb) ON CONFLICT(record_id) DO NOTHING RETURNING record_id",[record.id,gameKey,JSON.stringify(record)]);if(!inserted.rows.length)return send(res,409,{ok:false,error:"That record ID already exists. Use a new ID for a new saved game."});return send(res,201,{ok:true,record})}
  const del=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)$/);if(req.method==="DELETE"&&del){const id=decodeURIComponent(del[1]);const gone=await pool.query("DELETE FROM tracker_records WHERE record_id=$1 AND record_type=$2 RETURNING record_id",[id,"coordinated-game"]);if(!gone.rowCount)return send(res,404,{ok:false,error:"Saved coordinated game not found."});return send(res,200,{ok:true,deleted:1})}
+ const decision=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)\/(accept|ignore)$/);
+ if(req.method==="POST"&&decision){
+  const id=decodeURIComponent(decision[1]),action=decision[2],d=await readBody(req);
+  const got=await pool.query("SELECT payload FROM tracker_records WHERE record_id=$1 AND record_type='coordinated-game'",[id]);
+  if(!got.rows[0])return send(res,404,{ok:false,error:"Coordinated game not found."});
+  const old=got.rows[0].payload;let next;
+  try{
+   if(action==="accept")next=acceptCoordinatedPlan(old,{planId:d.planId,now:new Date().toISOString()});
+   else {next=ignoreCoordinatedAlert(old);next.lastIgnoredAt=new Date().toISOString();next.ignoredAlertCount=(Number(old.ignoredAlertCount)||0)+1;}
+  }catch(e){return send(res,409,{ok:false,error:e.message})}
+  const updated=await pool.query("UPDATE tracker_records SET payload=$2::jsonb,updated_at=NOW() WHERE record_id=$1 AND record_type='coordinated-game' AND payload->>'status'='tracking' RETURNING record_id",[id,JSON.stringify(next)]);
+  if(!updated.rowCount)return send(res,409,{ok:false,error:"Tracking status changed; reload before deciding."});
+  return send(res,200,{ok:true,decision:action,record:next,tracking:next.status==="tracking"});
+ }
  const life=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)\/(start|stop)$/);
  if(req.method==="POST"&&life){const id=decodeURIComponent(life[1]);const got=await pool.query("SELECT payload FROM tracker_records WHERE record_id=$1 AND record_type='coordinated-game'",[id]);if(!got.rows[0])return send(res,404,{ok:false,error:"Coordinated game not found."});const old=got.rows[0].payload;const next=life[2]==="start"?startTracking(old):stopTracking(old);await pool.query("UPDATE tracker_records SET payload=$2::jsonb,updated_at=NOW() WHERE record_id=$1",[id,JSON.stringify(next)]);return send(res,200,{ok:true,record:next})}
  if(req.method==="POST"&&u.pathname==="/api/ledger/sync"){let data=await readBody(req);if(!Array.isArray(data.records)||data.records.length>2000)return send(res,400,{ok:false,error:"Expected up to 2,000 records."});const c=await pool.connect();try{await c.query("BEGIN");for(const r of data.records){if(!r||r.id==null||!r.game||!r.recordType)continue;await c.query("INSERT INTO tracker_records(record_id,record_type,game_key,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(record_id) DO UPDATE SET record_type=EXCLUDED.record_type,game_key=EXCLUDED.game_key,payload=EXCLUDED.payload,updated_at=NOW()",[String(r.id),String(r.recordType).slice(0,32),String(r.game).toLowerCase().slice(0,300),JSON.stringify(r)])}await c.query("COMMIT")}catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}return send(res,200,{ok:true,synced:data.records.length})}
