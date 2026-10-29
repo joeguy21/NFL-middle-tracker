@@ -12,9 +12,6 @@ COPY game-status.js ./game-status.js
 COPY manifest.webmanifest ./manifest.webmanifest
 COPY apple-touch-icon.png ./apple-touch-icon.png
 COPY jg-icon.svg ./jg-icon.svg
-ENV NODE_ENV=production
-EXPOSE 10000
-CMD ["npm","start"]
 COPY coordinated-plan-preview.js ./coordinated-plan-preview.js
 COPY canonicalize-fanline-quotes.js ./canonicalize-fanline-quotes.js
 COPY coordinated-middle-planner.js ./coordinated-middle-planner.js
@@ -23,3 +20,8 @@ COPY cross-feed-event-matcher.js ./cross-feed-event-matcher.js
 COPY odds-eligibility.js ./odds-eligibility.js
 COPY hedge-calculator.js ./hedge-calculator.js
 COPY hedge-optimizer.js ./hedge-optimizer.js
+COPY coordinated-alert-service.js ./coordinated-alert-service.js
+COPY coordinated-alert-candidate.js ./coordinated-alert-candidate.js
+ENV NODE_ENV=production
+EXPOSE 10000
+CMD ["npm","start"]
