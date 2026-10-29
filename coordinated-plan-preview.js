@@ -23,6 +23,9 @@ function previewCoordinatedPlan({
         !x.sportsbook)) {
     throw new Error("Saved original wagers are incomplete or invalid.");
   }
+  if (legs.some(x => Math.abs(x.spread * 2 - Math.round(x.spread * 2)) > 1e-9)) {
+    throw new Error("Saved original quarter-point spreads require split-stake settlement and are not supported.");
+  }
   const event = record.event;
   const teamA = event.teamA || event.teams?.A || event.awayTeam;
   const teamB = event.teamB || event.teams?.B || event.homeTeam;
