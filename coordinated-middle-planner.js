@@ -125,14 +125,37 @@ function planMiddleFirst({
     y.middleWidth - x.middleWidth ||
     x.summary.addedStake - y.summary.addedStake
   );
+  // Present the best middle and one standalone hedge choice side by side.
+  // The hedge optimizer evaluates each original ticket separately; select ONE
+  // ticket's hedge only. Never combine the two independent ticket hedge outputs.
+  const hedgeChoices = independentPositions
+    .filter(position => position.bestHedge)
+    .map(position => ({
+      originalTeam: position.originalTeam,
+      originalTeamName: position.originalTeamName,
+      originalBook: position.originalBook,
+      originalStake: position.originalStake,
+      opposingTeam: position.opposingTeam,
+      recommendation: position.bestHedge
+    }));
+  hedgeChoices.sort((x, y) =>
+    (y.recommendation.summary.worstNet ?? -Infinity) -
+      (x.recommendation.summary.worstNet ?? -Infinity) ||
+    x.recommendation.leg.stake - y.recommendation.leg.stake
+  );
   return {
     best: plans[0] || null,
+    bestMiddle: plans[0] || null,
+    // This is a single selected hedge alternative, not an add-on to the middle.
+    hedgeRecommendation: hedgeChoices[0] || null,
+    hedgeAlternatives: hedgeChoices,
     alternatives: plans.slice(0, 10),
     qualifyingPackages: plans.length,
     independentPositions,
     eligibleQuoteCount: eligible.length,
     availableAddedBudget: budget,
-    warning: "Prototype only: integer-margin scenarios do not cover full settlement outcomes. Revalidate quotes and complete settlement modeling before action."
+    recommendationModes: ["middle", "single-original-ticket-hedge"],
+    warning: "Middle and hedge are separate recommendations. The hedge is against one original ticket only. Prototype integer-margin estimates are not guaranteed settlement outcomes. Revalidate quotes and complete settlement modeling before action."
   };
 }
 module.exports = { planMiddleFirst };
