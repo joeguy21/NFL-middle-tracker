@@ -11,6 +11,9 @@ assert.equal(calc.settleLeg(3, { team: "A", spread: -3, stake: 50, odds: -110 })
 assert.equal(calc.settleSpread(3, "B", 3.5), "win");
 // Team A -3.5 loses when A wins by 3.
 assert.equal(calc.settleSpread(3, "A", -3.5), "loss");
+// Quarter-point spreads must not be silently settled as ordinary wins/losses.
+assert.throws(() => calc.settleSpread(3, "A", -3.25), /split-stake settlement/);
+assert.equal(calc.settleSpread(3, "A", -3.5), "loss");
 // No proposed action preserves original wager outcomes.
 const summary = calc.summarizePlan([{team:"A",spread:3.5,stake:100,odds:120}]);
 assert.equal(summary.addedStake, 0);
