@@ -36,4 +36,5 @@ assert.equal(outcomes.evaluatedMarginRange.scenarioCount, 121);
 assert.ok(outcomes.outsideNet.teamAWin);
 assert.ok(outcomes.outsideNet.teamBWin);
 assert.equal(outcomes.modelingNotice.includes("not a complete settlement model"), true);
+assert.equal(outcomes.worstOutsideLossEstimate, outcomes.hedgeCostIfMiddleMisses, "Legacy field is retained but explicitly mirrored by correctly named combined-package loss estimate");
 console.log("Settlement calculator and outcome-summary tests passed.");
