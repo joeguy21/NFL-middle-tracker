@@ -21,4 +21,11 @@ assert.equal(result.hedgeCostIfMiddleMisses, Math.max(0, -result.worstOutsideNet
 assert.ok(result.modelingNotice.includes("integer margins"));
 assert.ok(Array.isArray(result.pushMargins));
 assert.throws(() => summarizeAlertOutcomes([], middle, middle), /required/);
+const highLine = summarizeAlertOutcomes(
+  [...original, {team:"A", spread:140.5, odds:-110, stake:1, sportsbook:"Test"}], middle, middle
+);
+assert.equal(highLine.evaluatedMarginRange.min, -143);
+assert.equal(highLine.evaluatedMarginRange.max, 143);
+assert.equal(highLine.evaluatedMarginRange.scenarioCount, 287,
+  "High alternate spreads must extend modeled margins past all wager thresholds.");
 console.log("coordinated-alert-outcomes tests passed");
