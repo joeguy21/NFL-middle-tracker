@@ -15,7 +15,7 @@ assert.ok(result.middleNet.minNet > result.outsideNet.teamAWin.minNet);
 assert.ok(result.outsideNet.teamAWin);
 assert.ok(result.outsideNet.teamBWin);
 assert.deepEqual(result.outsideNet.tie, { minNet: -7.09, maxNet: -7.09, margins: [0] }, "The tied-score scenario should preserve the modeled combined net.");
-assert.ok(result.middlePushNet);
+assert.equal(result.middlePushNet, null, "Half-point middle lines have no push scenarios in the integer-margin model.");
 assert.equal(result.evaluatedMarginRange.scenarioCount, 121);
 assert.equal(result.hedgeCostIfMiddleMisses, Math.max(0, -result.worstOutsideNet));
 assert.ok(result.modelingNotice.includes("integer margins"));
