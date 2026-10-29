@@ -9,8 +9,7 @@ const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
  */
 function previewCoordinatedPlan({
   record, payload, nowMs = Date.now(), sportsbook = "FanDuel",
-  minMiddleWidth, maxAddedStake = 300, maxTotalStake = 500,
-  stakeStep = 5, maxQuoteAgeMs = 30000
+  minMiddleWidth, stakeStep = 5, maxQuoteAgeMs = 30000
 } = {}) {
   if (!record || !record.event || !Array.isArray(record.originalLegs) || record.originalLegs.length !== 2) {
     throw new Error("A saved game with exactly two original wagers is required.");
@@ -52,7 +51,7 @@ function previewCoordinatedPlan({
   const plan = planMiddleFirst({
     originalLegs: legs, quotes, originalBooks,
     minMiddleWidth: minMiddleWidth ?? record.minimumMiddlePoints ?? 3,
-    maxAddedStake, maxTotalStake, stakeStep, nowMs, maxQuoteAgeMs
+    stakeStep, nowMs, maxQuoteAgeMs
   });
   // Planner computes complete-portfolio scenario results for the single added middle leg
   // and its distinct-book hedge, if available. Do not re-run the legacy two-added-leg helper.
