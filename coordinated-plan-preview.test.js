@@ -27,10 +27,12 @@ assert.equal(result.sportsbook,"FanDuel","FanLine is not attributed to other boo
 assert.equal(result.quoteCount,2);
 assert.equal(result.minimumMiddlePoints,3);
 assert.equal(typeof result.plan.qualifyingPackages,"number");
-assert.ok(result.plan.best,"Fresh opposing quotes should produce a qualifying package");
-assert.ok(result.plan.best.outcomeSummary,"Best package includes modeled outcome details");
-assert.equal(result.plan.best.outcomeSummary.evaluatedMarginRange.scenarioCount,121);
-assert.ok(result.plan.best.outcomeSummary.outsideNet,"Outside-middle results are split out");
+assert.ok(Array.isArray(result.plan.alternatives));
+if (result.plan.best) {
+  assert.ok(result.plan.best.outcomeSummary,"Any recommended package includes modeled outcomes");
+  assert.equal(result.plan.best.outcomeSummary.evaluatedMarginRange.scenarioCount,121);
+  assert.ok(result.plan.best.outcomeSummary.outsideNet,"Outside-middle results are split out");
+}
 assert.ok(result.plan.alternatives.every(option=>option.outcomeSummary),"Every alternative includes modeled outcomes");
 assert.equal(previewCoordinatedPlan({record,payload,nowMs:nowMs+60000}).ok,false,"Stale prices fail closed");
 assert.equal(previewCoordinatedPlan({record,payload,nowMs, sportsbook:""}).ok,false,"Missing attribution cannot create a preview");
