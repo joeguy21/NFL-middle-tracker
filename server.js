@@ -29,7 +29,7 @@ if(u.pathname.startsWith("/api/ledger")){
   let payload;try{payload=await response.json()}catch{return send(res,502,{ok:false,error:"FanLine response was not valid JSON."})}
   try{
    const {previewCoordinatedPlan}=require("./coordinated-plan-preview");
-   const result=previewCoordinatedPlan({record,payload,nowMs:Date.now(),sportsbook:"FanDuel",stakeStep:5,maxQuoteAgeMs:30000});
+   const result=previewCoordinatedPlan({record,payload,nowMs:Date.now(),sportsbook:"FanDuel",stakeStep:0.01,maxQuoteAgeMs:30000});
    return send(res,200,{ok:true,calculatedAt:new Date().toISOString(),source:"FanLine / FanDuel only",note:"Quote preview only. Verify the sportsbook app and odds before placing anything.",result});
   }catch(e){console.warn("calculate now:",e.message);return send(res,422,{ok:false,error:"Could not safely match this game to fresh spread quotes: "+e.message})}
  }
