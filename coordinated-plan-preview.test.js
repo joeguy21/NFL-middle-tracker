@@ -30,7 +30,7 @@ assert.equal(typeof result.plan.qualifyingPackages,"number");
 assert.ok(Array.isArray(result.plan.alternatives));
 if (result.plan.best) {
   assert.ok(result.plan.best.outcomeSummary,"Any recommended package includes modeled outcomes");
-  assert.equal(result.plan.best.outcomeSummary.evaluatedMarginRange.scenarioCount,121);
+  assert.equal(result.plan.best.outcomeSummary.evaluatedMarginRange.scenarioCount,201);
   assert.ok(result.plan.best.outcomeSummary.outsideNet,"Outside-middle results are split out");
 }
 assert.ok(result.plan.alternatives.every(option=>option.outcomeSummary),"Every alternative includes modeled outcomes");
