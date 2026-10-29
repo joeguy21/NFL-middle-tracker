@@ -2,6 +2,7 @@
 const {Pool}=require("pg");
 const {nextPollDelay}=require("./odds-poll-scheduler");
 const {matchGameStatus}=require("./game-status");
+const {ensureAlertTable,evaluateAndStoreAlerts}=require("./coordinated-alert-service");
 const API_KEY=process.env.FANLINE_API_KEY,DB=process.env.DATABASE_URL,BASE="https://api.fanlinewire.com";
 const ESPN="https://site.api.espn.com/apis/site/v2/sports";
 if(!API_KEY||!DB)throw new Error("Set FANLINE_API_KEY and DATABASE_URL.");
@@ -65,6 +66,9 @@ async function captureOdds(){
   const sourceTime=payload&&(payload.updated_at||payload.last_updated||payload.timestamp);
   await pool.query("INSERT INTO odds_observations(captured_at,source_updated_at,payload,request_status) VALUES($1,$2,$3::jsonb,$4)",[capturedAt,sourceTime?new Date(sourceTime):null,JSON.stringify(payload),response.status]);
   console.log(new Date().toISOString(),"Odds snapshot saved; bytes:",Buffer.byteLength(raw));
+  const records=await activeRecords();
+  const alertStats=await evaluateAndStoreAlerts({pool,records,payload,nowMs:Date.now()});
+  console.log("Coordinated alert evaluation:",JSON.stringify(alertStats));
  }catch(err){try{await pool.query("INSERT INTO odds_observations(captured_at,payload,error_text) VALUES($1,$2::jsonb,$3)",[capturedAt,JSON.stringify({error:String(err.message||err)}),String(err.message||err).slice(0,500)])}catch(dbErr){console.error("Unable to record collector error:",dbErr.message)}console.error("Odds poll failed:",err.message||err)}
 }
 async function cycle(){
@@ -81,7 +85,7 @@ async function cycle(){
  }catch(err){console.error("Collector cycle failed:",err.message||err);delay=60000}
  finally{busy=false;if(!closing)timer=setTimeout(cycle,delay);console.log("Next scheduler check in",Math.round(delay/1000),"seconds");}
 }
-async function main(){await ensureTable();console.log("Status-aware odds collector started.");await cycle();}
+async function main(){await ensureTable();await ensureAlertTable(pool);console.log("Status-aware odds collector started.");await cycle();}
 main().catch(e=>{console.error(e);process.exit(1)});
 async function shutdown(){if(closing)return;closing=true;if(timer)clearTimeout(timer);while(busy)await new Promise(r=>setTimeout(r,100));await pool.end();process.exit(0)}
 process.on("SIGTERM",shutdown);process.on("SIGINT",shutdown);
