@@ -9,7 +9,7 @@ const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
  */
 function previewCoordinatedPlan({
   record, payload, nowMs = Date.now(), sportsbook = "FanDuel",
-  minMiddleWidth, stakeStep = 5, maxQuoteAgeMs = 30000
+  minMiddleWidth, stakeStep = 0.01, maxQuoteAgeMs = 30000
 } = {}) {
   if (!record || !record.event || !Array.isArray(record.originalLegs) || record.originalLegs.length !== 2) {
     throw new Error("A saved game with exactly two original wagers is required.");
