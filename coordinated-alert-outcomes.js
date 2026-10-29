@@ -37,14 +37,22 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
   const outside = rows.filter(x => !x.middleHit && !x.pushInMiddle);
   const teamAOutside = outside.filter(x => x.marginA > 0);
   const teamBOutside = outside.filter(x => x.marginA < 0);
+  const tiedOutside = outside.filter(x => x.marginA === 0);
+  const middlePushRows = rows.filter(x => x.pushInMiddle);
   const worstOutside = outside.length ? Math.min(...outside.map(x => x.net)) : null;
   return {
     middleNet: summarize(inside),
-    outsideNet: { teamAWin: summarize(teamAOutside), teamBWin: summarize(teamBOutside) },
+    outsideNet: {
+      teamAWin: summarize(teamAOutside),
+      teamBWin: summarize(teamBOutside),
+      tie: summarize(tiedOutside)
+    },
     hedgeCostIfMiddleMisses: worstOutside == null ? null : Math.max(0, -worstOutside),
     worstOutsideNet: worstOutside,
-    pushMargins: rows.filter(x => x.pushInMiddle).map(x => x.marginA),
-    modelingNotice: "Integer-margin estimate only. Verify half-point pushes, settlement rules, and quote freshness before betting."
+    middlePushNet: summarize(middlePushRows),
+    pushMargins: middlePushRows.map(x => x.marginA),
+    evaluatedMarginRange: { min: minMargin, max: maxMargin, scenarioCount: rows.length },
+    modelingNotice: "Modeled integer margins only. This is not a complete settlement model; confirm alternate-line push handling, overtime/void rules, quote freshness, and all original wagers before betting."
   };
 }
 module.exports = { summarizeAlertOutcomes };
