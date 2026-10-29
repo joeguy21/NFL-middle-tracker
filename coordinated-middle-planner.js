@@ -33,7 +33,6 @@ function planMiddleFirst({
     const newTeam=pairedOriginal.team==="A"?"B":"A";
     const otherOriginal=originalLegs.find(l=>l!==pairedOriginal);
     for (const q of eligible.filter(x=>x.team===newTeam)) {
-      if (!sameMarket(q,quotes.find(x=>x.quoteId===q.quoteId)||q)) { /* quote was normalized; market checks below use context */ }
       const width=Math.round((pairedOriginal.spread+q.spread)*100)/100;
       if (width+1e-8<minMiddleWidth || budget<stakeStep) continue;
       // Start the middle at the paired ticket's stake; hedge sizing is optimized separately at cent precision.
