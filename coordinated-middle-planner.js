@@ -45,10 +45,14 @@ function planMiddleFirst({
         normalizeBook(h.sportsbook)!==normalizeBook(middleLeg.sportsbook) &&
         sameMarket(q,h)).map(h=>({team:h.team,spread:h.spread,odds:h.odds,
           sportsbook:h.sportsbook,quoteId:h.quoteId,timestampMs:h.timestampMs}));
+      const remainingSearchWindow=Math.max(0,budget-middleStake);
+      const packageBase=[...originalLegs,middleLeg];
       const hedgeResult=optimizeSingleLegHedges({
-        originalLegs:[otherOriginal],candidates:hedgeCandidates,
-        maxAddedStake:Math.max(0,budget-middleStake),
-        maxTotalStake:otherOriginal.stake + Math.max(stakeStep, originalStake * 3),stakeStep
+        // Optimize the hedge against the complete package, not the target ticket in isolation.
+        originalLegs:packageBase,candidates:hedgeCandidates,
+        maxAddedStake:remainingSearchWindow,
+        maxTotalStake:packageBase.reduce((s,l)=>s+l.stake,0)+remainingSearchWindow,
+        stakeStep
       });
       const hedge=hedgeResult.best;
       // Size hedge on its target ticket first; keep total portfolio math separate.
