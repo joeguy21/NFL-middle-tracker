@@ -11,6 +11,10 @@ const original = [
 ];
 const result = summarizeAlertOutcomes(original, middle, middle);
 assert.ok(result.middleNet);
+assert.equal(typeof result.hedgeComparison.worstOutsideBeforeHedge, "number");
+assert.equal(typeof result.hedgeComparison.worstOutsideWithProposedPackage, "number");
+assert.equal(result.hedgeComparison.modeledWorstCaseImprovement,
+  Math.round((result.hedgeComparison.worstOutsideWithProposedPackage - result.hedgeComparison.worstOutsideBeforeHedge) * 100) / 100);
 assert.deepEqual(result.packageExposure, {
   originalStake: 40, proposedStake: 200, totalStaked: 240,
   note: "Total staked is turnover across all legs, not net risk or worst-case loss."
