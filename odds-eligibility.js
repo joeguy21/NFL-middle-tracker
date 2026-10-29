@@ -8,6 +8,8 @@ function normalizeBook(value) {
 function isEligibleQuote(quote, exclusions = {}, options = {}) {
   if (!quote || !["A", "B"].includes(quote.team)) return false;
   if (!Number.isFinite(quote.spread) || !Number.isFinite(quote.odds) || quote.odds === 0) return false;
+  // Only whole- and half-point spreads are modeled. Quarter-points require split settlement.
+  if (Math.abs(quote.spread * 2 - Math.round(quote.spread * 2)) > 1e-9) return false;
   if (!quote.sportsbook || !String(quote.sportsbook).trim()) return false;
   if (options.nowMs != null) {
     if (!Number.isFinite(quote.timestampMs)) return false;
