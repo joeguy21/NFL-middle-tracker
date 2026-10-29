@@ -44,4 +44,23 @@ function stopTracking(record,{now=new Date().toISOString()}={}) {
     throw new Error("Only active tracking can be stopped.");
   return {...record,status:"stopped",stoppedAt:now};
 }
-module.exports={createCoordinatedGame,startTracking,stopTracking};
+/**
+ * Accepting a recommendation completes this tracked set. Persist the returned
+ * record so subsequent polling skips it. This records acceptance, not wager placement.
+ */
+function acceptCoordinatedPlan(record,{planId,now=new Date().toISOString()}={}) {
+  if (!record || record.recordType!=="coordinated-game" || record.status!=="tracking")
+    throw new Error("Only an actively tracked game can accept a plan.");
+  if (typeof planId!=="string" || !planId.trim()) throw new Error("A plan ID is required.");
+  return {...stopTracking(record,{now}),acceptedPlanId:planId.trim(),acceptedAt:now};
+}
+/**
+ * Ignoring an alert deliberately makes no lifecycle change: keep tracking and
+ * allow later alerts, including updated recommendations.
+ */
+function ignoreCoordinatedAlert(record) {
+  if (!record || record.recordType!=="coordinated-game" || record.status!=="tracking")
+    throw new Error("Only an actively tracked game can ignore an alert.");
+  return {...record};
+}
+module.exports={createCoordinatedGame,startTracking,stopTracking,acceptCoordinatedPlan,ignoreCoordinatedAlert};
