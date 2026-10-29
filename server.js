@@ -35,6 +35,14 @@ if(u.pathname.startsWith("/api/ledger")){
  }
  if(req.method==="GET"&&u.pathname==="/api/ledger"){let r=await pool.query("SELECT payload FROM tracker_records ORDER BY updated_at");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
  if(req.method==="GET"&&u.pathname==="/api/ledger/coordinated-games"){const r=await pool.query("SELECT payload FROM tracker_records WHERE record_type='coordinated-game' ORDER BY updated_at DESC");return send(res,200,{ok:true,records:r.rows.map(x=>x.payload)})}
+ if(req.method==="GET"&&u.pathname==="/api/ledger/coordinated-alerts"){
+  const recordId=u.searchParams.get("recordId");
+  const limit=Math.min(100,Math.max(1,Number(u.searchParams.get("limit"))||30));
+  const rows=recordId
+   ? await pool.query("SELECT alert_id,record_id,candidate,created_at FROM coordinated_alerts WHERE record_id=$1 ORDER BY created_at DESC LIMIT $2",[recordId,limit])
+   : await pool.query("SELECT alert_id,record_id,candidate,created_at FROM coordinated_alerts ORDER BY created_at DESC LIMIT $1",[limit]);
+  return send(res,200,{ok:true,alerts:rows.rows.map(x=>({id:x.alert_id,recordId:x.record_id,createdAt:x.created_at,...x.candidate}))});
+ }
  if(req.method==="POST"&&u.pathname==="/api/ledger/coordinated-games"){const d=await readBody(req);const record=createCoordinatedGame({id:d.id,event:d.event,legs:d.legs,minimumMiddlePoints:d.minimumMiddlePoints??3});record.game=record.event.awayTeam+" vs "+record.event.homeTeam;const gameKey=record.game.toLowerCase().slice(0,300);const inserted=await pool.query("INSERT INTO tracker_records(record_id,record_type,game_key,payload) VALUES($1,'coordinated-game',$2,$3::jsonb) ON CONFLICT(record_id) DO NOTHING RETURNING record_id",[record.id,gameKey,JSON.stringify(record)]);if(!inserted.rows.length)return send(res,409,{ok:false,error:"That record ID already exists. Use a new ID for a new saved game."});return send(res,201,{ok:true,record})}
  const del=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)$/);if(req.method==="DELETE"&&del){const id=decodeURIComponent(del[1]);const gone=await pool.query("DELETE FROM tracker_records WHERE record_id=$1 AND record_type=$2 RETURNING record_id",[id,"coordinated-game"]);if(!gone.rowCount)return send(res,404,{ok:false,error:"Saved coordinated game not found."});return send(res,200,{ok:true,deleted:1})}
  const decision=u.pathname.match(/^\/api\/ledger\/coordinated-games\/([^/]+)\/(accept|ignore)$/);
