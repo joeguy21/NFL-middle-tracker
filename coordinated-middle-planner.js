@@ -1,6 +1,7 @@
 const { eligibleQuotes } = require("./odds-eligibility");
 const { summarizePlan } = require("./hedge-calculator");
 const { optimizeSingleLegHedges } = require("./hedge-optimizer");
+const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
 
 /**
  * Prototype middle-first coordinated planner.
@@ -71,12 +72,21 @@ function planMiddleFirst({
         const selectedHedge = bestHedge && bestHedge.leg;
         const legs = selectedHedge ? [...middleLegs, selectedHedge] : middleLegs;
         const summary = summarizePlan(originalLegs, legs);
+        const outcomeSummary = summarizeAlertOutcomes(originalLegs, legs, middleLegs);
         plans.push({
           middleWidth: width,
           middleLegs,
           hedgeLeg: selectedHedge,
           legs,
           summary,
+          outcomeSummary,
+          jointEvaluation: {
+            totalExposure: outcomeSummary.packageExposure.totalStaked,
+            worstOutsideNet: outcomeSummary.worstOutsideNet,
+            middleHitNet: outcomeSummary.middleNet,
+            worstCaseImprovement: outcomeSummary.hedgeComparison.modeledWorstCaseImprovement,
+            decisionBasis: "All selected legs evaluated together across the integer-margin scenario range; provisional settlement model."
+          },
           quoteTimestamps: [a.timestampMs, b.timestampMs],
           quoteIds: [a.quoteId, b.quoteId].filter(Boolean)
         });
@@ -107,8 +117,11 @@ function planMiddleFirst({
       note:"Ticket-level comparison only. Do not add independently optimized stakes together without recomputing the full coordinated package."
     };
   });
+  // Rank using the jointly settled complete package, not a ticket's
+  // independently optimized hedge score. Favor downside outside the
+  // middle first, then middle width, then lower incremental exposure.
   plans.sort((x, y) =>
-    y.summary.worstNet - x.summary.worstNet ||
+    (y.outcomeSummary.worstOutsideNet ?? -Infinity) - (x.outcomeSummary.worstOutsideNet ?? -Infinity) ||
     y.middleWidth - x.middleWidth ||
     x.summary.addedStake - y.summary.addedStake
   );
