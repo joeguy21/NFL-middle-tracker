@@ -13,6 +13,9 @@ assert.deepEqual(got.map(q=>q.sportsbook), ["Caesars", "FanDuel"]);
 assert.equal(isEligibleQuote(quotes[0], {A:" fanduel "}), false);
 assert.equal(isEligibleQuote(quotes[3], {A:"FanDuel"}), true);
 
+// Quarter-point lines require split settlement and must not reach this planner.
+assert.equal(isEligibleQuote({...quotes[0], spread:-3.25}), false);
+assert.equal(isEligibleQuote({...quotes[0], spread:-3}), true);
 // Unknown, malformed, or stale quotes must not be action candidates.
 assert.equal(isEligibleQuote({...quotes[1], odds:0}), false);
 assert.equal(isEligibleQuote(quotes[1], {}, {nowMs:100000, maxQuoteAgeMs:30000}), false);
