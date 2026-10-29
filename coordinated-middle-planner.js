@@ -36,7 +36,7 @@ function planMiddleFirst({
       if (!sameMarket(q,quotes.find(x=>x.quoteId===q.quoteId)||q)) { /* quote was normalized; market checks below use context */ }
       const width=Math.round((pairedOriginal.spread+q.spread)*100)/100;
       if (width+1e-8<minMiddleWidth || budget<stakeStep) continue;
-      const middleStake=Math.floor((budget+1e-8)/stakeStep)*stakeStep;
+      const middleStake=Math.floor((Math.min(budget, pairedOriginal.stake)+1e-8)/stakeStep)*stakeStep;
       const middleLeg={team:q.team,spread:q.spread,odds:q.odds,stake:middleStake,
         sportsbook:q.sportsbook,quoteId:q.quoteId,timestampMs:q.timestampMs};
       // Hedge is a separate alternative targeting the other saved original ticket.
