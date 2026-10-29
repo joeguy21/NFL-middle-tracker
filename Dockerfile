@@ -22,6 +22,7 @@ COPY hedge-calculator.js ./hedge-calculator.js
 COPY hedge-optimizer.js ./hedge-optimizer.js
 COPY coordinated-alert-service.js ./coordinated-alert-service.js
 COPY coordinated-alert-candidate.js ./coordinated-alert-candidate.js
+COPY coordinated-alert-outcomes.js ./coordinated-alert-outcomes.js
 ENV NODE_ENV=production
 EXPOSE 10000
 CMD ["npm","start"]
