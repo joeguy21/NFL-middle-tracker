@@ -10,7 +10,7 @@ const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
  */
 function planMiddleFirst({
   originalLegs, quotes, originalBooks = {}, minMiddleWidth = 3,
-  maxAddedStake = 300, maxTotalStake = 500, stakeStep = 5,
+  stakeStep = 5,
   nowMs, maxQuoteAgeMs = 30000
 }) {
   if (!Array.isArray(originalLegs) || originalLegs.length !== 2 ||
@@ -18,11 +18,11 @@ function planMiddleFirst({
     throw new Error("Exactly two opposing original wagers are required.");
   }
   if (!Array.isArray(quotes)) throw new Error("Spread quotes must be an array.");
-  if (!(minMiddleWidth >= 0) || !(stakeStep > 0) || !(maxAddedStake >= 0) || !(maxTotalStake > 0)) throw new Error("Invalid planner limits.");
+  if (!(minMiddleWidth >= 0) || !(stakeStep > 0)) throw new Error("Invalid planner settings.");
   const options = { nowMs, maxQuoteAgeMs };
   const eligible = eligibleQuotes(quotes, originalBooks, options);
   const originalStake = originalLegs.reduce((s,l)=>s+l.stake,0);
-  const budget = Math.max(0, Math.min(maxAddedStake, maxTotalStake-originalStake));
+  // No account/game exposure ceiling. Keep a practical search window derived from existing ticket size; this only bounds optimization work, not the amount a user may bet.\n  const budget = Math.max(stakeStep, originalStake * 3);
   const sameMarket = (a,b) => {
     const keys=["eventId","league","category","period","marketType"];
     return keys.every(k=>a[k]!=null && b[k]!=null && String(a[k]).trim()!=="" &&
@@ -48,7 +48,7 @@ function planMiddleFirst({
       const hedgeResult=optimizeSingleLegHedges({
         originalLegs:[otherOriginal],candidates:hedgeCandidates,
         maxAddedStake:Math.max(0,budget-middleStake),
-        maxTotalStake:maxTotalStake-otherOriginal.stake,stakeStep
+        maxTotalStake:otherOriginal.stake + Math.max(stakeStep, originalStake * 3),stakeStep
       });
       const hedge=hedgeResult.best;
       // Size hedge on its target ticket first; keep total portfolio math separate.
@@ -82,7 +82,7 @@ function planMiddleFirst({
     hedgeRecommendation:best?.hedgeRecommendation||null,
     hedgeAlternatives:best?.hedgeRecommendation?[best.hedgeRecommendation]:[],
     alternatives:plans.slice(0,10),qualifyingPackages:plans.length,
-    eligibleQuoteCount:eligible.length,availableAddedBudget:budget,
+    eligibleQuoteCount:eligible.length,optimizationSearchWindow:budget,
     recommendationModes:["qualifying-middle-trigger","distinct-book-hedge"],
     warning:"A qualifying middle triggers the coordinated recommendation. Middle is one new wager paired with one original ticket; hedge targets the other original ticket and must use a different sportsbook. Quotes shown only reflect supplied sportsbook feeds. Outcome estimates are provisional."
   };
