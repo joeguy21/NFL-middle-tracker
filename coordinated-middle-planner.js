@@ -10,7 +10,7 @@ const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
  */
 function planMiddleFirst({
   originalLegs, quotes, originalBooks = {}, minMiddleWidth = 3,
-  stakeStep = 5,
+  stakeStep = 0.01,
   nowMs, maxQuoteAgeMs = 30000
 }) {
   if (!Array.isArray(originalLegs) || originalLegs.length !== 2 ||
@@ -36,7 +36,8 @@ function planMiddleFirst({
       if (!sameMarket(q,quotes.find(x=>x.quoteId===q.quoteId)||q)) { /* quote was normalized; market checks below use context */ }
       const width=Math.round((pairedOriginal.spread+q.spread)*100)/100;
       if (width+1e-8<minMiddleWidth || budget<stakeStep) continue;
-      const middleStake=stakeStep;
+      // Start the middle at the paired ticket's stake; hedge sizing is optimized separately at cent precision.
+      const middleStake=Math.round(pairedOriginal.stake*100)/100;
       const middleLeg={team:q.team,spread:q.spread,odds:q.odds,stake:middleStake,
         sportsbook:q.sportsbook,quoteId:q.quoteId,timestampMs:q.timestampMs};
       // Hedge is a separate alternative targeting the other saved original ticket.
