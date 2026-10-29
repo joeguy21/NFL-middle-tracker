@@ -1,5 +1,6 @@
 const { canonicalizeFanLineQuotes } = require("./canonicalize-fanline-quotes");
 const { planMiddleFirst } = require("./coordinated-middle-planner");
+const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
 
 /**
  * Build a read-only plan preview for one saved coordinated game.
@@ -50,6 +51,17 @@ function previewCoordinatedPlan({
     minMiddleWidth: minMiddleWidth ?? record.minimumMiddlePoints ?? 3,
     maxAddedStake, maxTotalStake, stakeStep, nowMs, maxQuoteAgeMs
   });
+  // Attach modeled outcome details to every displayed package. This is read-only;
+  // the preview never records or places a wager.
+  if (plan.best) {
+    plan.best.outcomeSummary = summarizeAlertOutcomes(
+      legs, plan.best.legs, plan.best.middleLegs
+    );
+  }
+  plan.alternatives = plan.alternatives.map(option => ({
+    ...option,
+    outcomeSummary: summarizeAlertOutcomes(legs, option.legs, option.middleLegs)
+  }));
   return {
     ok: true, sportsbook, quoteCount: quotes.length,
     minimumMiddlePoints: minMiddleWidth ?? record.minimumMiddlePoints ?? 3,
