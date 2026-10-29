@@ -40,18 +40,30 @@ async function calculateNow(id){
   const data=await api("/api/ledger/coordinated-games/"+encodeURIComponent(id)+"/calculate-now",{method:"POST",body:"{}"});
   const plan=data.result?.plan;
   if(!data.ok||!plan){out.textContent=JSON.stringify(data,null,2);return}
-  const positions=plan.independentPositions||[];
-  let html='<b>Independent original-ticket hedge analysis</b>';
-  if(!positions.length)html+='<p>No independent hedge breakdown returned by this preview.</p>';
-  for(const p of positions){
-   const h=p.bestHedge;
-   html+='<section class="item"><b>Original '+esc(p.originalTeamName||p.originalTeam)+'</b><p class="muted">Original stake $'+esc(p.originalStake)+' · '+esc(p.originalBook)+'</p>';
-   html+=h?'<p>Best single-ticket hedge candidate: '+esc(h.leg.team)+' '+(h.leg.spread>0?"+":"")+esc(h.leg.spread)+' · '+esc(h.leg.odds)+' · $'+esc(h.leg.stake)+' at '+esc(h.leg.sportsbook)+'</p><p class="muted">Ticket-only modeled worst net: $'+esc(h.summary.worstNet)+'</p>':'<p>No eligible hedge found with current matching quotes.</p>';
-   html+='<p class="muted">'+esc(p.note||"Candidate only; not automatically added to the coordinated package.")+'</p></section>';
-  }
-  html+='<p><b>Middle package</b></p>';
-  html+=plan.best?'<p>Middle width: '+esc(plan.best.middleWidth)+' points · proposed added stake: $'+esc(plan.best.summary.addedStake)+' · combined modeled worst net: $'+esc(plan.best.summary.worstNet)+'</p>':'<p>No qualifying middle package found at the selected threshold.</p>';
-  html+='<p class="muted">Provider: FanDuel via FanLine. Independent hedges are ticket-level alternatives and must not be combined without full package re-optimization. Prototype scenarios are not guarantees.</p>';
+  const best=plan.bestMiddle||plan.best;
+  const hedge=plan.hedgeRecommendation;
+  const fmtOdds=n=>(Number(n)>0?"+":"")+esc(n);
+  const fmtSpread=n=>(Number(n)>0?"+":"")+esc(n);
+  const legLine=l=>'<li>'+esc(l.teamName||l.team)+' '+fmtSpread(l.spread)+' · '+fmtOdds(l.odds)+' · $'+esc(l.stake)+' at '+esc(l.sportsbook)+'</li>';
+  let html='<h3>Option 1 — Middle opportunity</h3>';
+  if(best){
+   html+='<p><b>Middle width: '+esc(best.middleWidth)+' points</b></p><p>New wagers:</p><ul>'+best.middleLegs.map(legLine).join("")+'</ul>';
+   html+='<p>Additional stake: $'+esc(best.middleLegs.reduce((s,l)=>s+Number(l.stake||0),0).toFixed(2))+'</p>';
+   const mid=best.outcomeSummary?.middleNet;
+   html+='<p>Modeled middle-hit combined net: '+(mid?('$'+esc(mid.minNet)+' to $'+esc(mid.maxNet)):'Not available')+'</p>';
+   const outside=best.outcomeSummary?.outsideNet;
+   if(outside)html+='<p>Modeled outside-middle net — Team A win: '+(outside.teamAWin?'$'+esc(outside.teamAWin.minNet)+' to $'+esc(outside.teamAWin.maxNet):'—')+'; Team B win: '+(outside.teamBWin?'$'+esc(outside.teamBWin.minNet)+' to $'+esc(outside.teamBWin.maxNet):'—')+'</p>';
+   html+='<p class="muted">This option contains the middle wagers only. It does not include the separate hedge.</p>';
+  }else html+='<p>No qualifying middle found at your selected width with current eligible quotes.</p>';
+  html+='<hr><h3>Option 2 — Hedge one original ticket</h3>';
+  if(hedge?.recommendation?.leg){
+   const h=hedge.recommendation, l=h.leg;
+   html+='<p><b>Hedge target:</b> '+esc(hedge.originalTeamName)+' original ticket · $'+esc(hedge.originalStake)+' at '+esc(hedge.originalBook)+'</p>';
+   html+='<p><b>Proposed hedge:</b> '+esc(l.teamName||l.team)+' '+fmtSpread(l.spread)+' · '+fmtOdds(l.odds)+' · wager $'+esc(l.stake)+' at '+esc(l.sportsbook)+'</p>';
+   html+='<p>Modeled worst net for this original ticket plus hedge: $'+esc(h.summary.worstNet)+'</p>';
+   html+='<p class="muted">This is a standalone alternative, not an add-on to Option 1. The chosen hedge protects only the named original ticket.</p>';
+  }else html+='<p>No eligible single-ticket hedge found in the available quotes.</p>';
+  html+='<p class="muted">Source: FanLine / FanDuel only. Prices may move. This preview does not confirm availability at other books or place wagers. Modeled results are estimates; confirm full settlement rules and prices.</p>';
   html+='<button class="secondary" onclick="decideAlert(\''+esc(id)+'\')">Ignore — keep tracking</button>';
   out.innerHTML=html;
  }catch(e){out.textContent="No plan returned: "+e.message+"\\n\\nRequires fresh, uniquely matched FanDuel spread quotes."}
