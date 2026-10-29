@@ -14,7 +14,7 @@ assert.ok(result.middleNet);
 assert.ok(result.middleNet.minNet > result.outsideNet.teamAWin.minNet);
 assert.ok(result.outsideNet.teamAWin);
 assert.ok(result.outsideNet.teamBWin);
-assert.equal(result.outsideNet.tie, null, "A tied score is currently classified as a push/middle-push in this integer model; don't invent a separate outside bucket.");
+assert.deepEqual(result.outsideNet.tie, { minNet: -7.09, maxNet: -7.09, margins: [0] }, "The tied-score scenario should preserve the modeled combined net.");
 assert.ok(result.middlePushNet);
 assert.equal(result.evaluatedMarginRange.scenarioCount, 121);
 assert.equal(result.hedgeCostIfMiddleMisses, Math.max(0, -result.worstOutsideNet));
