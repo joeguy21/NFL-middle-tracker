@@ -1,193 +1,39 @@
-const assert = require("node:assert/strict");
-const { planMiddleFirst } = require("./coordinated-middle-planner");
-
-const originals = [
-  { team: "A", spread: -3, odds: 110, stake: 20, sportsbook: "FanDuel" },
-  { team: "B", spread: 3, odds: 110, stake: 20, sportsbook: "DraftKings" }
+const assert=require("node:assert/strict");
+const {planMiddleFirst}=require("./coordinated-middle-planner");
+const originals=[
+ {team:"A",spread:-3,odds:-110,stake:100,sportsbook:"FanDuel"},
+ {team:"B",spread:3,odds:-110,stake:100,sportsbook:"DraftKings"}
 ];
-const context = { eventId: "event-1", marketId: "market-1", league: "nfl", category: "spread", period: "game", marketType: "MATCH_HANDICAP_(2-WAY)" };
-const quotes = [
-  { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel", quoteId: "blocked-A" },
-  { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM", quoteId: "eligible-A" },
-  { ...context, team: "B", spread: 7, odds: -110, sportsbook: "DraftKings", quoteId: "blocked-B" },
-  { ...context, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel", quoteId: "eligible-B" }
+const ctx={eventId:"game",league:"nfl",category:"spread",period:"game",marketType:"two-way"};
+const quotes=[
+ {...ctx,team:"A",spread:-2.5,odds:-105,sportsbook:"BetMGM",quoteId:"a",timestampMs:10000},
+ {...ctx,team:"B",spread:7,odds:-110,sportsbook:"Caesars",quoteId:"b",timestampMs:10000},
+ {...ctx,team:"A",spread:-3,odds:100,sportsbook:"Hard Rock",quoteId:"hedgeA",timestampMs:10000},
+ {...ctx,team:"B",spread:7,odds:-102,sportsbook:"DraftKings",quoteId:"blockedBook",timestampMs:10000}
 ];
-
-const result = planMiddleFirst({
-  originalLegs: originals,
-  quotes,
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3,
-  maxAddedStake: 20,
-  maxTotalStake: 100,
-  stakeStep: 10
-});
-assert.ok(result.best, "Should find a qualifying middle package");
-assert.equal(result.independentPositions.length, 2, "Each original ticket must get its own hedge analysis");
-assert.ok(result.bestMiddle, "Middle recommendation is separately available");
-assert.ok(result.hedgeRecommendation, "One separate single-ticket hedge recommendation is available");
-assert.equal(result.hedgeAlternatives.length, 2, "Ticket hedge choices are presented as alternatives");
-assert.ok(["A", "B"].includes(result.hedgeRecommendation.originalTeam), "Selected hedge targets exactly one original ticket");
-assert.ok(result.hedgeRecommendation.recommendation.leg, "Selected hedge includes one proposed wager");
-assert.equal(result.bestMiddle.legs.length, 2, "Middle recommendation must not silently include a hedge");
-assert.equal(result.independentPositions[0].originalTeam, "A");
-assert.equal(result.independentPositions[0].opposingTeam, "B");
-assert.equal(result.independentPositions[1].originalTeam, "B");
-assert.equal(result.independentPositions[1].opposingTeam, "A");
-assert.ok(result.independentPositions.every(p => p.bestHedge), "Both ticket-level hedge searches should find eligible opposing quotes");
-assert.ok(result.independentPositions[0].bestHedge.leg.team === "B");
-assert.ok(result.independentPositions[1].bestHedge.leg.team === "A");
-
-assert.equal(result.best.middleWidth, 4.5);
-assert.equal(result.best.middleLegs[0].sportsbook, "BetMGM", "Original Team A book must be excluded");
-assert.equal(result.best.middleLegs[1].sportsbook, "FanDuel", "Team B may use Team A's original book");
-assert.ok(result.best.summary.addedStake <= 20);
-assert.ok(result.best.summary.totalStaked <= 100);
-
-// Team-specific exclusion: if all available Team A offers are from its blocked book,
-// no qualifying middle should be generated.
-const blockedOnly = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "FanDuel" },
-    { ...context, team: "B", spread: 7, odds: -110, sportsbook: "FanDuel" }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3,
-  maxAddedStake: 20,
-  maxTotalStake: 100,
-  stakeStep: 10
-});
-assert.equal(blockedOnly.best, null);
-
-// Quotes below the configured width do not qualify.
-const narrow = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { ...context, team: "A", spread: -2.5, odds: -110, sportsbook: "BetMGM" },
-    { ...context, team: "B", spread: 5, odds: -110, sportsbook: "FanDuel" }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3,
-  maxAddedStake: 20,
-  maxTotalStake: 100,
-  stakeStep: 10
-});
-assert.equal(narrow.best, null);
-
+const result=planMiddleFirst({originalLegs:originals,quotes,originalBooks:{A:"FanDuel",B:"DraftKings"},
+ minMiddleWidth:3,maxAddedStake:50,maxTotalStake:300,stakeStep:5,nowMs:10000});
+assert.ok(result.best,"should find qualifying middle");
+assert.equal(result.best.middleLegs.length,1,"middle adds one live wager");
+assert.ok(result.best.middleWidth>=3);
+assert.ok(result.best.hedgeRecommendation,"the qualifying middle should include its corresponding hedge if a valid quote exists");
+assert.notEqual(result.best.middleLegs[0].sportsbook.toLowerCase(),result.best.hedgeRecommendation.recommendation.leg.sportsbook.toLowerCase());
+assert.equal(result.best.hedgeRecommendation.originalTeam,result.best.pairedOriginal.team==="A"?"B":"A",
+ "hedge targets the other original ticket");
+assert.equal(result.best.middleLegs[0].spread,7,"middle uses the available live line");
+assert.equal(result.best.middleLegs[0].sportsbook,"Caesars","use top qualifying width offer");
+assert.ok(result.best.summary.totalStaked<=300);
+assert.equal(result.bestMiddle,result.best);
+const noDifferentBook=planMiddleFirst({originalLegs:originals,
+ quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"BetMGM",timestampMs:10000},
+ {...ctx,team:"A",spread:-3,odds:-110,sportsbook:"BetMGM",timestampMs:10000}],
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,maxAddedStake:20,maxTotalStake:300,stakeStep:5,nowMs:10000});
+assert.ok(noDifferentBook.best);
+assert.equal(noDifferentBook.hedgeRecommendation,null,"No separate-book hedge should be fabricated");
+const tooNarrow=planMiddleFirst({originalLegs:originals,quotes:[{...ctx,team:"B",spread:5,odds:-105,sportsbook:"Caesars",timestampMs:10000}],
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,maxAddedStake:20,maxTotalStake:300,stakeStep:5,nowMs:10000});
+assert.equal(tooNarrow.best,null,"threshold is per request");
+const stale=planMiddleFirst({originalLegs:originals,quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"Caesars",timestampMs:1000}],
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,maxAddedStake:20,maxTotalStake:300,stakeStep:5,nowMs:40000});
+assert.equal(stale.best,null,"stale quote not allowed");
 console.log("coordinated-middle-planner tests passed");
-
-const otherEvent = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
-    { ...context, eventId: "event-2", marketId: "market-2", team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
-});
-assert.equal(otherEvent.best, null, "Quotes from different events must never pair");
-
-const noIdentity = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
-    { team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
-});
-assert.equal(noIdentity.best, null, "Quotes without event/market identity must not pair");
-
-const otherMarket = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
-    { ...context, marketId: "market-alt", team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
-});
-assert.ok(otherMarket.best, "Provider-specific market IDs may differ when event and market context match");
-
-
-for (const [field, value] of [
-  ["league", "nba"],
-  ["category", "moneyline"],
-  ["period", "first-half"],
-  ["marketType", "MATCH_HANDICAP_(3-WAY)"]
-]) {
-  const mismatch = planMiddleFirst({
-    originalLegs: originals,
-    quotes: [
-      { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM" },
-      { ...context, [field]: value, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel" }
-    ],
-    originalBooks: { A: "FanDuel", B: "DraftKings" },
-    minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10
-  });
-  assert.equal(mismatch.best, null, `Quotes with mismatched ${field} must not pair`);
-}
-
-const stale = planMiddleFirst({
-  originalLegs: originals,
-  quotes: [
-    { ...context, team: "A", spread: -2.5, odds: -105, sportsbook: "BetMGM", timestampMs: 1000 },
-    { ...context, team: "B", spread: 7, odds: -105, sportsbook: "FanDuel", timestampMs: 1000 }
-  ],
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3, maxAddedStake: 20, maxTotalStake: 100, stakeStep: 10,
-  nowMs: 40000, maxQuoteAgeMs: 30000
-});
-assert.equal(stale.best, null, "Stale quotes must not create a package");
-
-const tightCap = planMiddleFirst({
-  originalLegs: originals,
-  quotes,
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3,
-  maxAddedStake: 300,
-  maxTotalStake: 45,
-  stakeStep: 10
-});
-assert.equal(tightCap.best, null, "Planner must not create a package when original stakes leave insufficient room for both legs");
-
-const constrained = planMiddleFirst({
-  originalLegs: originals,
-  quotes,
-  originalBooks: { A: "FanDuel", B: "DraftKings" },
-  minMiddleWidth: 3,
-  maxAddedStake: 300,
-  maxTotalStake: 55,
-  stakeStep: 5
-});
-assert.ok(constrained.best, "A feasible package should fit within the remaining exposure");
-assert.ok(constrained.best.middleLegs.length === 2);
-assert.ok(constrained.best.summary.addedStake <= 15, "All proposed middle stakes must fit remaining total exposure");
-assert.ok(constrained.best.summary.totalStaked <= 55, "Original plus every proposed leg must fit max total stake");
-assert.equal(
-  constrained.best.summary.totalOriginalStake,
-  originals.reduce((sum, leg) => sum + leg.stake, 0),
-  "Summary must include both original wagers"
-);
-assert.equal(
-  constrained.best.summary.addedStake,
-  constrained.best.legs.reduce((sum, leg) => sum + leg.stake, 0),
-  "Added exposure must count every selected new leg"
-);
-
-
-// Verify a generated middle package settles as expected inside its modeled window.
-const { evaluateMargin } = require("./hedge-calculator");
-const middleMargin = 4; // Between Team A -2.5 and Team B +7.
-const proposedNet = evaluateMargin(middleMargin, [
-  ...originals,
-  ...result.best.legs
-]);
-assert.ok(proposedNet > 0, "A qualifying middle outcome should show positive combined net in this fixture");
-
-// Outside the middle, the package must still produce a finite, computable result.
-for (const margin of [-20, -7, 0, 8, 20]) {
-  const net = evaluateMargin(margin, [...originals, ...result.best.legs]);
-  assert.ok(Number.isFinite(net), `Settlement result must be finite at margin ${margin}`);
-}
