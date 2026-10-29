@@ -40,14 +40,14 @@ async function decideAlert(id,action,planId){
   await load();
  }catch(e){say("Could not save decision: "+e.message,"error")}
 }
+async function decideAlert(id,action){
+ if(!confirm("Ignore this alert? Tracking and future alerts will continue."))return;
+ try{await api("/api/ledger/coordinated-games/"+encodeURIComponent(id)+"/ignore",{method:"POST",body:"{}"});say("Alert ignored. Tracking continues.","success");$("calcResult").textContent="Alert ignored. This set remains active and can alert again.";await load()}catch(e){say("Could not save decision: "+e.message,"error")}
+}
 async function calculateNow(id){
  const out=$("calcResult");out.textContent="Fetching fresh odds and calculating…";
- try{
-  const data=await api("/api/ledger/coordinated-games/"+encodeURIComponent(id)+"/calculate-now",{method:"POST",body:"{}"});
-  const plan=data.result?.plan,best=plan?.best;
-  if(!data.ok||!best){out.textContent=JSON.stringify(data,null,2);return}
-  const planId=id+"-"+Date.parse(data.calculatedAt||new Date().toISOString());
-  out.innerHTML='<b>Coordinated recommendation preview</b><p>Source: '+esc(data.source||"Provider")+'</p><p>New proposed stake: 
+ try{const data=await api("/api/ledger/coordinated-games/"+encodeURIComponent(id)+"/calculate-now",{method:"POST",body:"{}"});out.textContent=JSON.stringify(data,null,2)+"\\n\\nThis is the existing prototype preview. Acceptance is not enabled until the independent middle-plus-hedge package is integrated.";if(data.ok)out.innerHTML+='<p><button class="secondary" onclick="decideAlert(\''+esc(id)+'\')">Ignore — keep tracking</button></p>'}catch(e){out.textContent="No plan returned: "+e.message+"\\n\\nRequires fresh, uniquely matched FanDuel spread quotes."}
+}
 async function act(id,action){try{if(action==="start"&&!confirm("Start tracking this saved game?"))return;if(action==="stop"&&!confirm("Stop tracking this game?"))return;await api("/api/ledger/coordinated-games/"+encodeURIComponent(id)+"/"+action,{method:"POST",body:"{}"});await load();say(action==="start"?"Tracking activated.":"Tracking stopped.","success")}catch(e){say(e.message,"error")}}
 async function removeGame(id){if(!confirm("Permanently delete this saved game and its wagers?"))return;try{await api("/api/ledger/coordinated-games/"+encodeURIComponent(id),{method:"DELETE"});await load();say("Saved game deleted.","success")}catch(e){say(e.message,"error")}}async function load(options={}){const data=await api("/api/ledger/coordinated-games",options);const el=$("games");if(!data.records?.length){el.textContent="No coordinated games saved yet.";return}el.innerHTML=data.records.map(r=>{const ev=r.event||{},legs=r.originalLegs||[];return '<div class="item"><b>'+esc(ev.awayTeam)+' @ '+esc(ev.homeTeam)+'</b> <span class="pill">'+esc(r.status)+'</span><p class="muted">'+esc(ev.league?.toUpperCase())+' · '+esc(ev.startTime)+'</p><p class="muted">Middle alert threshold: '+esc(Number.isFinite(Number(r.minimumMiddlePoints))?Number(r.minimumMiddlePoints):3)+' points or more</p>'+legs.map(l=>'<p class="muted">'+esc(l.teamName)+' '+(Number(l.spread)>0?"+":"")+esc(l.spread)+' · '+(Number(l.odds)>0?"+":"")+esc(l.odds)+' · $'+esc(l.stake)+' · '+esc(l.sportsbook)+'</p>').join("")+(r.status==="saved-not-tracking"?'<button onclick="act(\''+esc(r.id)+'\',\'start\')">Start Tracking This Game</button>':r.status==="tracking"?'<button class="secondary" onclick="calculateNow(\''+esc(r.id)+'\')">Calculate Now — Fresh Odds</button><button class="secondary" onclick="act(\''+esc(r.id)+'\',\'stop\')">Stop Tracking</button>':"")+'<button class="secondary" onclick="removeGame(&quot;'+esc(r.id)+'&quot;)">Delete Saved Game</button></div>'}).join("")}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
