@@ -14,7 +14,7 @@ async function evaluateAndStoreAlerts({pool,records,payload,nowMs=Date.now()}={}
   stats.evaluated++;
   try{
    if(String(record.event?.league||"").toLowerCase()!=="nfl")continue;
-   const preview=previewCoordinatedPlan({record,payload,nowMs,sportsbook:"FanDuel",maxAddedStake:300,maxTotalStake:300,maxQuoteAgeMs:30000});
+   const preview=previewCoordinatedPlan({record,payload,nowMs,sportsbook:"FanDuel",maxQuoteAgeMs:30000};
    if(!preview.ok)continue;
    const candidate=buildCoordinatedAlertCandidate({record,preview,checkedAt:new Date(nowMs).toISOString()});
    if(!candidate.eligible)continue;
