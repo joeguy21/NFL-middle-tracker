@@ -11,6 +11,10 @@ const original = [
 ];
 const result = summarizeAlertOutcomes(original, middle, middle);
 assert.ok(result.middleNet);
+assert.deepEqual(result.packageExposure, {
+  originalStake: 40, proposedStake: 200, totalStaked: 240,
+  note: "Total staked is turnover across all legs, not net risk or worst-case loss."
+});
 assert.ok(result.middleNet.minNet > result.outsideNet.teamAWin.minNet);
 assert.ok(result.outsideNet.teamAWin);
 assert.ok(result.outsideNet.teamBWin);
