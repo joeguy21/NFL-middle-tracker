@@ -5,7 +5,7 @@ const { evaluateMargin } = require("./hedge-calculator");
  * This uses the existing integer-margin model and is explicitly provisional:
  * pushes are calculated, but game-specific settlement rules must be verified.
  */
-function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargin = -60, maxMargin = 60) {
+function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargin = -100, maxMargin = 100) {
   if (!Array.isArray(originalLegs) || !originalLegs.length ||
       !Array.isArray(proposedLegs) || !Array.isArray(middleLegs) || middleLegs.length !== 2) {
     throw new Error("Original wagers and a two-leg middle package are required.");
@@ -55,7 +55,7 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
     middlePushNet: summarize(middlePushRows),
     pushMargins: middlePushRows.map(x => x.marginA),
     evaluatedMarginRange: { min: minMargin, max: maxMargin, scenarioCount: rows.length },
-    modelingNotice: "Modeled integer margins only. This is not a complete settlement model; confirm alternate-line push handling, overtime/void rules, quote freshness, and all original wagers before betting."
+    modelingNotice: "Modeled integer margins only. Scenarios cover integer margins from -100 to +100 only. This is not a complete settlement model; confirm alternate-line push handling, overtime/void rules, quote freshness, and all original wagers before betting."
   };
 }
 module.exports = { summarizeAlertOutcomes };
