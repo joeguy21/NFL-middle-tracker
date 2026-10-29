@@ -23,6 +23,15 @@ const result = planMiddleFirst({
   stakeStep: 10
 });
 assert.ok(result.best, "Should find a qualifying middle package");
+assert.equal(result.independentPositions.length, 2, "Each original ticket must get its own hedge analysis");
+assert.equal(result.independentPositions[0].originalTeam, "A");
+assert.equal(result.independentPositions[0].opposingTeam, "B");
+assert.equal(result.independentPositions[1].originalTeam, "B");
+assert.equal(result.independentPositions[1].opposingTeam, "A");
+assert.ok(result.independentPositions.every(p => p.bestHedge), "Both ticket-level hedge searches should find eligible opposing quotes");
+assert.ok(result.independentPositions[0].bestHedge.leg.team === "B");
+assert.ok(result.independentPositions[1].bestHedge.leg.team === "A");
+
 assert.equal(result.best.middleWidth, 4.5);
 assert.equal(result.best.middleLegs[0].sportsbook, "BetMGM", "Original Team A book must be excluded");
 assert.equal(result.best.middleLegs[1].sportsbook, "FanDuel", "Team B may use Team A's original book");
