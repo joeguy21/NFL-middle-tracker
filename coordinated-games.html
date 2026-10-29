@@ -45,25 +45,31 @@ async function calculateNow(id){
   const fmtOdds=n=>(Number(n)>0?"+":"")+esc(n);
   const fmtSpread=n=>(Number(n)>0?"+":"")+esc(n);
   const legLine=l=>'<li>'+esc(l.teamName||l.team)+' '+fmtSpread(l.spread)+' · '+fmtOdds(l.odds)+' · $'+esc(l.stake)+' at '+esc(l.sportsbook)+'</li>';
-  let html='<h3>Option 1 — Middle opportunity</h3>';
+  let html='<h3>Coordinated recommendation</h3>';
   if(best){
-   html+='<p><b>Middle width: '+esc(best.middleWidth)+' points</b></p><p>New wagers:</p><ul>'+best.middleLegs.map(legLine).join("")+'</ul>';
-   html+='<p>Additional stake: $'+esc(best.middleLegs.reduce((s,l)=>s+Number(l.stake||0),0).toFixed(2))+'</p>';
+   const middleLeg=best.middleLegs[0];
+   html+='<p><b>Middle width: '+esc(best.middleWidth)+' points</b></p>';
+   html+='<p><b>Middle wager:</b></p><ul>'+legLine(middleLeg)+'</ul>';
+   html+='<p><b>Paired with saved original:</b> '+esc(best.pairedOriginal.team)+' '+fmtSpread(best.pairedOriginal.spread)+' · $'+esc(best.pairedOriginal.stake)+' at '+esc(best.pairedOriginal.sportsbook)+'</p>';
+   if(hedge?.recommendation?.leg){
+    const h=hedge.recommendation,l=h.leg;
+    html+='<p><b>Companion hedge target:</b> '+esc(hedge.originalTeamName)+' original ticket · $'+esc(hedge.originalStake)+' at '+esc(hedge.originalBook)+'</p>';
+    html+='<p><b>Hedge wager:</b></p><ul>'+legLine(l)+'</ul>';
+   }else html+='<p><b>Hedge unavailable:</b> '+esc(best.hedgeUnavailableReason||'No eligible different-book quote/stake.')+'</p>';
+   const proposed=best.legs||best.middleLegs;
+   const addStake=proposed.reduce((s,l)=>s+Number(l.stake||0),0);
+   html+='<p><b>Total proposed additional stake:</b> $'+esc(addStake.toFixed(2))+'</p>';
+   const exposure=best.outcomeSummary?.packageExposure;
+   if(exposure)html+='<p><b>Total game turnover:</b> $'+esc(exposure.totalStaked.toFixed(2))+' (originals + proposed wagers)</p>';
    const mid=best.outcomeSummary?.middleNet;
-   html+='<p>Modeled middle-hit combined net: '+(mid?('$'+esc(mid.minNet)+' to $'+esc(mid.maxNet)):'Not available')+'</p>';
+   html+='<p><b>Modeled combined net if middle hits:</b> '+(mid?('$'+esc(mid.minNet)+' to $'+esc(mid.maxNet)):'Not available')+'</p>';
    const outside=best.outcomeSummary?.outsideNet;
-   if(outside)html+='<p>Modeled outside-middle net — Team A win: '+(outside.teamAWin?'$'+esc(outside.teamAWin.minNet)+' to $'+esc(outside.teamAWin.maxNet):'—')+'; Team B win: '+(outside.teamBWin?'$'+esc(outside.teamBWin.minNet)+' to $'+esc(outside.teamBWin.maxNet):'—')+'</p>';
-   html+='<p class="muted">This option contains the middle wagers only. It does not include the separate hedge.</p>';
-  }else html+='<p>No qualifying middle found at your selected width with current eligible quotes.</p>';
-  html+='<hr><h3>Option 2 — Hedge one original ticket</h3>';
-  if(hedge?.recommendation?.leg){
-   const h=hedge.recommendation, l=h.leg;
-   html+='<p><b>Hedge target:</b> '+esc(hedge.originalTeamName)+' original ticket · $'+esc(hedge.originalStake)+' at '+esc(hedge.originalBook)+'</p>';
-   html+='<p><b>Proposed hedge:</b> '+esc(l.teamName||l.team)+' '+fmtSpread(l.spread)+' · '+fmtOdds(l.odds)+' · wager $'+esc(l.stake)+' at '+esc(l.sportsbook)+'</p>';
-   html+='<p>Modeled worst net for this original ticket plus hedge: $'+esc(h.summary.worstNet)+'</p>';
-   html+='<p class="muted">This is a standalone alternative, not an add-on to Option 1. The chosen hedge protects only the named original ticket.</p>';
-  }else html+='<p>No eligible single-ticket hedge found in the available quotes.</p>';
-  html+='<p class="muted">Source: FanLine / FanDuel only. Prices may move. This preview does not confirm availability at other books or place wagers. Modeled results are estimates; confirm full settlement rules and prices.</p>';
+   if(outside)html+='<p><b>Modeled combined net outside middle:</b> Team A wins: '+(outside.teamAWin?'$'+esc(outside.teamAWin.minNet)+' to $'+esc(outside.teamAWin.maxNet):'—')+'; Team B wins: '+(outside.teamBWin?'$'+esc(outside.teamBWin.minNet)+' to $'+esc(outside.teamBWin.maxNet):'—')+'</p>';
+   const compare=best.outcomeSummary?.hedgeComparison;
+   if(compare&&compare.modeledWorstCaseImprovement!=null)html+='<p><b>Modeled worst-outside change from adding hedge:</b> $'+esc(compare.modeledWorstCaseImprovement.toFixed(2))+'</p>';
+   html+='<p class="muted">Both recommendations are shown together. Estimates include both original tickets and all proposed wagers. This is not a guaranteed profit or a bet placement.</p>';
+  }else html+='<p>No qualifying middle found at your selected minimum width with current eligible quotes.</p>';
+  html+='<p class="muted">Source: FanLine / FanDuel only. Prices may move. Confirm current line, odds, stake, sportsbook eligibility, and settlement rules before acting.</p>';
   html+='<button class="secondary" onclick="decideAlert(\''+esc(id)+'\')">Ignore — keep tracking</button>';
   out.innerHTML=html;
  }catch(e){out.textContent="No plan returned: "+e.message+"\\n\\nRequires fresh, uniquely matched FanDuel spread quotes."}
