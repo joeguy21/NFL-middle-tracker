@@ -47,6 +47,9 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
       teamBWin: summarize(teamBOutside),
       tie: summarize(tiedOutside)
     },
+    // This is the worst modeled combined package loss outside the middle, not the incremental cost of a hedge.
+    worstOutsideLossEstimate: worstOutside == null ? null : Math.max(0, -worstOutside),
+    // Backward-compatible legacy field; deprecated because its name overstates what it measures.
     hedgeCostIfMiddleMisses: worstOutside == null ? null : Math.max(0, -worstOutside),
     worstOutsideNet: worstOutside,
     middlePushNet: summarize(middlePushRows),
