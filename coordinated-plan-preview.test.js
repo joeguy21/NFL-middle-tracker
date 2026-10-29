@@ -37,6 +37,7 @@ assert.ok(result.plan.alternatives.every(option=>option.outcomeSummary),"Every a
 assert.equal(previewCoordinatedPlan({record,payload,nowMs:nowMs+60000}).ok,false,"Stale prices fail closed");
 assert.equal(previewCoordinatedPlan({record,payload,nowMs, sportsbook:""}).ok,false,"Missing attribution cannot create a preview");
 assert.throws(()=>previewCoordinatedPlan({record:{...record,originalLegs:[record.originalLegs[0]]},payload,nowMs}),/exactly two/);
+assert.throws(()=>previewCoordinatedPlan({record:{...record,originalLegs:record.originalLegs.map((leg,i)=>i===0?{...leg,spread:7.25}:leg)},payload,nowMs}),/split-stake settlement/);
 const mismatch={markets:payload.markets.map(m=>({...m,away_team:"New England Patriots"}))};
 assert.equal(previewCoordinatedPlan({record,payload:mismatch,nowMs}).ok,false,"Mismatch fails closed");
 console.log("coordinated plan preview tests passed");
