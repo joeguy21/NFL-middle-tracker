@@ -24,6 +24,12 @@ const result = planMiddleFirst({
 });
 assert.ok(result.best, "Should find a qualifying middle package");
 assert.equal(result.independentPositions.length, 2, "Each original ticket must get its own hedge analysis");
+assert.ok(result.bestMiddle, "Middle recommendation is separately available");
+assert.ok(result.hedgeRecommendation, "One separate single-ticket hedge recommendation is available");
+assert.equal(result.hedgeAlternatives.length, 2, "Ticket hedge choices are presented as alternatives");
+assert.ok(["A", "B"].includes(result.hedgeRecommendation.originalTeam), "Selected hedge targets exactly one original ticket");
+assert.ok(result.hedgeRecommendation.recommendation.leg, "Selected hedge includes one proposed wager");
+assert.equal(result.bestMiddle.legs.length, 2, "Middle recommendation must not silently include a hedge");
 assert.equal(result.independentPositions[0].originalTeam, "A");
 assert.equal(result.independentPositions[0].opposingTeam, "B");
 assert.equal(result.independentPositions[1].originalTeam, "B");
