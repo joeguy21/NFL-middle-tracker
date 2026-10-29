@@ -54,17 +54,8 @@ function previewCoordinatedPlan({
     minMiddleWidth: minMiddleWidth ?? record.minimumMiddlePoints ?? 3,
     maxAddedStake, maxTotalStake, stakeStep, nowMs, maxQuoteAgeMs
   });
-  // Attach modeled outcome details to every displayed package. This is read-only;
-  // the preview never records or places a wager.
-  if (plan.best) {
-    plan.best.outcomeSummary = summarizeAlertOutcomes(
-      legs, plan.best.legs, plan.best.middleLegs
-    );
-  }
-  plan.alternatives = plan.alternatives.map(option => ({
-    ...option,
-    outcomeSummary: summarizeAlertOutcomes(legs, option.legs, option.middleLegs)
-  }));
+  // Planner computes complete-portfolio scenario results for the single added middle leg
+  // and its distinct-book hedge, if available. Do not re-run the legacy two-added-leg helper.
   return {
     ok: true, sportsbook, quoteCount: quotes.length,
     minimumMiddlePoints: minMiddleWidth ?? record.minimumMiddlePoints ?? 3,
