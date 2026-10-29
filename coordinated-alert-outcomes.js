@@ -11,6 +11,9 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
     throw new Error("Original wagers and a two-leg middle package are required.");
   }
   const allLegs = [...originalLegs, ...proposedLegs];
+  const stakeTotal = legs => legs.reduce((sum, leg) => sum + leg.stake, 0);
+  const originalStake = stakeTotal(originalLegs);
+  const proposedStake = stakeTotal(proposedLegs);
   // Include representative tails beyond every line threshold so a high alternate spread
   // cannot silently fall outside the modeled range. Retain at least +/-100 scenarios.
   const maxAbsSpread = Math.max(0, ...allLegs.map(leg => Math.abs(leg.spread)),
@@ -51,6 +54,13 @@ function summarizeAlertOutcomes(originalLegs, proposedLegs, middleLegs, minMargi
   const middlePushRows = rows.filter(x => x.pushInMiddle);
   const worstOutside = outside.length ? Math.min(...outside.map(x => x.net)) : null;
   return {
+    packageExposure: {
+      originalStake: Math.round(originalStake * 100) / 100,
+      proposedStake: Math.round(proposedStake * 100) / 100,
+      totalStaked: Math.round((originalStake + proposedStake) * 100) / 100,
+      // Stake exposure is amount wagered, not maximum possible loss.
+      note: "Total staked is turnover across all legs, not net risk or worst-case loss."
+    },
     middleNet: summarize(inside),
     outsideNet: {
       teamAWin: summarize(teamAOutside),
