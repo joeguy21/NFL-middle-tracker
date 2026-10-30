@@ -22,7 +22,8 @@ function planMiddleFirst({
   const options = { nowMs, maxQuoteAgeMs };
   const eligible = eligibleQuotes(quotes, originalBooks, options);
   const originalStake = originalLegs.reduce((s,l)=>s+l.stake,0);
-  // No account/game exposure ceiling. Keep a practical search window derived from existing ticket size; this only bounds optimization work, not the amount a user may bet.\n  const budget = Math.max(stakeStep, originalStake * 3);
+  // No account/game exposure ceiling. Keep a practical search window derived from existing ticket size; this only bounds optimization work, not the amount a user may bet.
+  const budget = Math.max(stakeStep, originalStake * 3);
   const sameMarket = (a,b) => {
     const keys=["eventId","league","category","period","marketType"];
     return keys.every(k=>a[k]!=null && b[k]!=null && String(a[k]).trim()!=="" &&
