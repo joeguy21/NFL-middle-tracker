@@ -21,7 +21,8 @@ assert.notEqual(result.best.middleLegs[0].sportsbook.toLowerCase(),result.best.h
 assert.equal(result.best.hedgeRecommendation.originalTeam,result.best.pairedOriginal.team==="A"?"B":"A",
  "hedge targets the other original ticket");
 assert.equal(result.best.middleLegs[0].spread,7,"middle uses the available live line");
-assert.equal(result.best.middleLegs[0].stake,Math.round((result.best.pairedOriginal.odds>0 ? result.best.pairedOriginal.stake*result.best.pairedOriginal.odds/100 : result.best.pairedOriginal.stake*100/Math.abs(result.best.pairedOriginal.odds))*100)/100,"middle stake targets paired original ticket win profit");
+const pairedInput=originals.find(x=>x.team===result.best.pairedOriginal.team);
+assert.equal(result.best.middleLegs[0].stake,Math.round((pairedInput.odds>0 ? pairedInput.stake*pairedInput.odds/100 : pairedInput.stake*100/Math.abs(pairedInput.odds))*100)/100,"middle stake targets paired original ticket win profit");
 assert.equal(Math.round(result.best.hedgeRecommendation.recommendation.leg.stake*100),result.best.hedgeRecommendation.recommendation.leg.stake*100,"hedge stake is represented to penny precision");
 assert.equal(result.best.middleLegs[0].sportsbook,"Caesars","use top qualifying width offer");
 assert.ok(result.best.summary.totalStaked>0,"recommendation should report its full portfolio turnover");
