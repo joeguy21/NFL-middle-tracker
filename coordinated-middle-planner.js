@@ -1,5 +1,5 @@
 const { eligibleQuotes, normalizeBook } = require("./odds-eligibility");
-const { summarizePlan } = require("./hedge-calculator");
+const { summarizePlan, profitOnAmericanOdds } = require("./hedge-calculator");
 const { optimizeSingleLegHedges } = require("./hedge-optimizer");
 const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
 
@@ -36,8 +36,9 @@ function planMiddleFirst({
     for (const q of eligible.filter(x=>x.team===newTeam)) {
       const width=Math.round((pairedOriginal.spread+q.spread)*100)/100;
       if (width+1e-8<minMiddleWidth || budget<stakeStep) continue;
-      // Start the middle at the paired ticket's stake; hedge sizing is optimized separately at cent precision.
-      const middleStake=Math.round(pairedOriginal.stake*100)/100;
+      // Size middle to offset the paired original's win profit when the new
+      // opposing wager loses. This targets the paired slice, not whole package.
+      const middleStake=Math.round(profitOnAmericanOdds(pairedOriginal.stake,pairedOriginal.odds)*100)/100;
       const middleLeg={team:q.team,spread:q.spread,odds:q.odds,stake:middleStake,
         sportsbook:q.sportsbook,quoteId:q.quoteId,timestampMs:q.timestampMs};
       // Hedge is a separate alternative targeting the other saved original ticket.
