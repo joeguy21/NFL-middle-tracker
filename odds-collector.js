@@ -40,7 +40,11 @@ async function refreshGameStatuses(records){
      const result=await pool.query("UPDATE tracker_records SET payload=$2::jsonb,updated_at=NOW() WHERE record_id=$1 AND record_type='coordinated-game' AND payload->>'status'='tracking'",[record.id,JSON.stringify(updated)]);
      if(result.rowCount){finalized++;console.log("Confirmed final; tracking stopped:",record.game||record.id);}
     }else{
-     console.log("Game status",record.game||record.id,status.status,status.reason||status.sourceStatus||"");
+     const gameStatus=status.status==="in-progress"?"in-progress":status.status==="scheduled"?"scheduled":status.status==="interrupted"?"interrupted":"unknown";
+     const updated={...record,gameStatus,gameStatusSource:"ESPN scoreboard",gameStatusEventId:status.eventId||null,gameStatusCheckedAt:new Date().toISOString()};
+     delete updated.record_id;
+     await pool.query("UPDATE tracker_records SET payload=$2::jsonb,updated_at=NOW() WHERE record_id=$1 AND record_type='coordinated-game' AND payload->>'status'='tracking'",[record.id,JSON.stringify(updated)]);
+     console.log("Game status",record.game||record.id,gameStatus,status.reason||status.sourceStatus||"");
     }
    }
   }catch(err){console.error("Game-status check failed; leaving records tracked:",group.path,group.date,err.message||err);}
@@ -54,6 +58,11 @@ function postgresSafeJson(value){
  if(Array.isArray(value))return value.map(postgresSafeJson);
  if(value&&typeof value==="object"){const out={};for(const [k,v] of Object.entries(value))out[postgresSafeJson(k)]=postgresSafeJson(v);return out;}
  return value;
+}
+async function oddsDue(){
+ const result=await pool.query("SELECT MAX(captured_at) AS latest FROM odds_observations");
+ const latest=result.rows[0]?.latest?new Date(result.rows[0].latest).getTime():0;
+ return Date.now()-latest>=60*60*1000;
 }
 async function captureOdds(){
  const capturedAt=new Date().toISOString();
@@ -80,7 +89,13 @@ async function cycle(){
    await refreshGameStatuses(records);
    records=await activeRecords();
    if(!records.length){console.log("All tracked games are final; odds requests paused.");}
-   else{delay=nextPollDelay(records);await captureOdds();records=await activeRecords();delay=nextPollDelay(records);}
+   else{
+    delay=nextPollDelay(records);
+    const live=records.some(r=>String(r.gameStatus||"").toLowerCase()==="in-progress");
+    if(live||await oddsDue())await captureOdds();
+    else console.log("Odds request skipped; hourly cadence not due and no tracked game confirmed live.");
+    records=await activeRecords();delay=nextPollDelay(records);
+   }
   }
  }catch(err){console.error("Collector cycle failed:",err.message||err);delay=60000}
  finally{busy=false;if(!closing)timer=setTimeout(cycle,delay);console.log("Next scheduler check in",Math.round(delay/1000),"seconds");}
