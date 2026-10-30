@@ -30,8 +30,8 @@ const noHedge = summarizeAlertOutcomes(original, [middleLeg], middleLeg, pairedO
 assert.equal(noHedge.packageExposure.proposedStake, 5);
 assert.equal(noHedge.packageExposure.totalStaked, 45);
 const highLine = summarizeAlertOutcomes(
-  [...original, {team:"A", spread:140.5, odds:-110, stake:1, sportsbook:"Test"}],
-  packageLegs, middleLeg, pairedOriginal
+  original, [...packageLegs, {team:"A", spread:140.5, odds:-110, stake:1, sportsbook:"Test"}],
+  middleLeg, pairedOriginal
 );
 assert.equal(highLine.evaluatedMarginRange.min, -143);
 assert.equal(highLine.evaluatedMarginRange.max, 143);
