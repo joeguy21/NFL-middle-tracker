@@ -21,10 +21,11 @@ assert.notEqual(result.best.middleLegs[0].sportsbook.toLowerCase(),result.best.h
 assert.equal(result.best.hedgeRecommendation.originalTeam,result.best.pairedOriginal.team==="A"?"B":"A",
  "hedge targets the other original ticket");
 assert.equal(result.best.middleLegs[0].spread,7,"middle uses the available live line");
-assert.equal(result.best.middleLegs[0].stake,result.best.pairedOriginal.stake,"middle stake starts equal to the paired original ticket");
+assert.equal(result.best.middleLegs[0].stake,Math.round((result.best.pairedOriginal.odds>0 ? result.best.pairedOriginal.stake*result.best.pairedOriginal.odds/100 : result.best.pairedOriginal.stake*100/Math.abs(result.best.pairedOriginal.odds))*100)/100,"middle stake targets paired original ticket win profit");
 assert.equal(Math.round(result.best.hedgeRecommendation.recommendation.leg.stake*100),result.best.hedgeRecommendation.recommendation.leg.stake*100,"hedge stake is represented to penny precision");
 assert.equal(result.best.middleLegs[0].sportsbook,"Caesars","use top qualifying width offer");
 assert.ok(result.best.summary.totalStaked>0,"recommendation should report its full portfolio turnover");
+assert.equal(result.best.middleLegs[0].stake,90.91,"$100 at -110 pairs with $90.91 on the opposing middle leg to offset win profit when it loses");
 assert.equal(result.bestMiddle,result.best);
 const noDifferentBook=planMiddleFirst({originalLegs:originals,
  quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"BetMGM",timestampMs:10000},
