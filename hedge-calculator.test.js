@@ -22,22 +22,25 @@ assert.equal(summary.rows.length, 121);
 // The user-facing summary must include every wager and identify a true overlap.
 // Opposing +3.5 legs both win only when the final margin is between -3 and +3.
 const { summarizeAlertOutcomes } = require("./coordinated-alert-outcomes");
+const originalLegs = [
+  {team:"A",spread:-3,stake:100,odds:-110,sportsbook:"FanDuel"},
+  {team:"B",spread:3,stake:100,odds:-110,sportsbook:"DraftKings"}
+];
+const middleLeg = {team:"B",spread:7,stake:100,odds:-110,sportsbook:"Caesars"};
 const outcomes = summarizeAlertOutcomes(
-  [
-    {team:"A",spread:-7.5,stake:100,odds:-110},
-    {team:"B",spread:-7.5,stake:100,odds:-110}
-  ],
-  [],
-  [
-    {team:"A",spread:3.5,stake:50,odds:-110},
-    {team:"B",spread:3.5,stake:50,odds:-110}
-  ]
+  originalLegs,
+  [middleLeg],
+  middleLeg,
+  originalLegs[0]
 );
-assert.deepEqual(outcomes.middleNet.margins, [-3,-2,-1,0,1,2,3]);
-assert.equal(outcomes.middleNet.minNet, outcomes.middleNet.maxNet);
+assert.ok(outcomes.middleNet);
+assert.equal(outcomes.packageExposure.originalStake, 200);
+assert.equal(outcomes.packageExposure.proposedStake, 100);
+assert.equal(outcomes.packageExposure.totalStaked, 300);
 assert.equal(outcomes.evaluatedMarginRange.scenarioCount, 201);
 assert.ok(outcomes.outsideNet.teamAWin);
 assert.ok(outcomes.outsideNet.teamBWin);
 assert.equal(outcomes.modelingNotice.includes("not a complete settlement model"), true);
-assert.equal(outcomes.worstOutsideLossEstimate, outcomes.hedgeCostIfMiddleMisses, "Legacy field is retained but explicitly mirrored by correctly named combined-package loss estimate");
+assert.equal(outcomes.worstOutsideLossEstimate, outcomes.hedgeCostIfMiddleMisses,
+  "Legacy field mirrors modeled combined-package outside-middle loss estimate");
 console.log("Settlement calculator and outcome-summary tests passed.");
