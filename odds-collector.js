@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS odds_observations(
 CREATE INDEX IF NOT EXISTS odds_observations_captured_idx ON odds_observations(captured_at);`);}
 async function activeRecords(){const r=await pool.query("SELECT record_id,payload FROM tracker_records WHERE record_type='coordinated-game' AND payload->>'status'='tracking'");return r.rows.map(x=>({id:x.record_id,...x.payload}));}
 function espnPath(league){const v=String(league||"nfl").toLowerCase();if(v==="nfl")return "football/nfl";if(v==="nba")return "basketball/nba";return null;}
-function dateKey(record){const t=Date.parse(record.event?.startTime);return Number.isFinite(t)?new Date(t).toISOString().slice(0,10).replace(/-/g,""):null;}
+function dateKey(record){const t=Date.parse(record.event?.startTime);if(!Number.isFinite(t))return null;const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(t));const v=Object.fromEntries(parts.map(p=>[p.type,p.value]));return v.year+v.month+v.day;}
 async function refreshGameStatuses(records){
  const now=Date.now(),groups=new Map();
  for(const record of records){
