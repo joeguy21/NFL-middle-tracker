@@ -1,6 +1,8 @@
 /**
  * Normalize explicit FanLine NFL full-game spread selections.
- * Conservative: requires exactly two opposing selections and valid timestamps.
+ * When the provider omits per-market update time, the caller's response-received
+ * time (nowMs) is used as observation time. This proves retrieval recency only,
+ * not when the sportsbook price itself last changed.
  */
 const { normTeam } = require("./cross-feed-event-matcher");
 function normalizeFanLineSpreads(payload,{teamA,teamB,sportsbook,nowMs,maxAgeMs=30000}={}) {
@@ -13,13 +15,15 @@ function normalizeFanLineSpreads(payload,{teamA,teamB,sportsbook,nowMs,maxAgeMs=
   const league=String(first(m,["league","league_name","sport","sport_name"])||"").toLowerCase();
   const category=String(first(m,["category","market","market_name","market_type"])||"").toLowerCase();
   const period=String(first(m,["period","market_period"])||"").toLowerCase();
-  if(!/(^|\b)nfl(\b|$)|football/.test(league)||!/spread|handicap/.test(category)||!["game","full game","full-game","match"].includes(period))continue;
+  if(!/(^|\\b)nfl(\\b|$)|football/.test(league)||!/spread|handicap/.test(category)||!["game","full game","full-game","match"].includes(period))continue;
   const marketStatus=String(m.status||"").toUpperCase();
   if(marketStatus&&!["OPEN","ACTIVE","PRE"].includes(marketStatus))continue;
   const eventTeams=[first(m,["away_team","awayTeam"]),first(m,["home_team","homeTeam"])].map(normTeam);
   if(!eventTeams.includes(normTeam(teamA))||!eventTeams.includes(normTeam(teamB)))continue;
   const rawTime=first(m,["updated_at","updatedAt","last_updated","lastUpdated","timestamp"]);
-  const updated=Date.parse(rawTime);
+  const parsed=rawTime===undefined?NaN:Date.parse(rawTime);
+  const usedObservationTime=!Number.isFinite(parsed);
+  const updated=usedObservationTime?Number(nowMs):parsed;
   if(!Number.isFinite(updated)||(nowMs!=null&&(updated>nowMs||nowMs-updated>maxAgeMs)))continue;
   const selections=first(m,["selections","outcomes","prices"]);
   if(!Array.isArray(selections)||selections.length!==2)continue;
@@ -30,7 +34,7 @@ function normalizeFanLineSpreads(payload,{teamA,teamB,sportsbook,nowMs,maxAgeMs=
    const odds=Number(first(sel,["american","american_odds","odds","price"]));
    const st=String(sel.status||"").toUpperCase();
    if(!team||seen.has(team)||(st&&!["ACTIVE","OPEN","PRE"].includes(st))||!Number.isFinite(spread)||!Number.isFinite(odds)||odds===0){invalid=true;break;}
-   seen.add(team);staged.push({team,spread,odds,sportsbook:String(sportsbook).trim(),timestampMs:updated,quoteId:String(sel.selection_id||sel.id||""),marketId:String(m.market_id||m.marketId||""),eventId:String(m.event_id||m.eventId||""),event:m.event,period,category:"spread",marketType:m.market_type||m.marketType||m.market_name||"spread"});
+   seen.add(team);staged.push({team,spread,odds,sportsbook:String(sportsbook).trim(),timestampMs:updated,timestampBasis:usedObservationTime?"response_observed":"provider_quote",quoteId:String(sel.selection_id||sel.id||""),marketId:String(m.market_id||m.marketId||""),eventId:String(m.event_id||m.eventId||""),event:m.event,period,category:"spread",marketType:m.market_type||m.marketType||m.market_name||"spread"});
   }
   if(invalid||seen.size!==2||Math.abs(staged[0].spread+staged[1].spread)>.001)continue;
   quotes.push(...staged);
