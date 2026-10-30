@@ -39,4 +39,25 @@ assert.equal(tooNarrow.best,null,"threshold is per request");
 const stale=planMiddleFirst({originalLegs:originals,quotes:[{...ctx,team:"B",spread:7,odds:-105,sportsbook:"Caesars",timestampMs:1000}],
  originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:3,stakeStep:0.01,nowMs:40000});
 assert.equal(stale.best,null,"stale quote not allowed");
+
+const sampleOriginals=[
+ {team:"A",spread:3.5,odds:113,stake:10,sportsbook:"FanDuel",teamName:"Carolina"},
+ {team:"B",spread:-5.5,odds:107,stake:10,sportsbook:"DraftKings",teamName:"Green Bay"}
+];
+const sampleQuotes=[
+ {...ctx,team:"A",spread:10.5,odds:-112,sportsbook:"Caesars",quoteId:"live-middle",timestampMs:10000},
+ {...ctx,team:"B",spread:-3.5,odds:-400,sportsbook:"FanDuel",quoteId:"live-hedge",timestampMs:10000}
+];
+const sample=planMiddleFirst({originalLegs:sampleOriginals,quotes:sampleQuotes,
+ originalBooks:{A:"FanDuel",B:"DraftKings"},minMiddleWidth:4,stakeStep:.01,nowMs:10000});
+assert.ok(sample.best,"the 4+ point middle should qualify");
+assert.equal(sample.best.pairedOriginal.team,"B","Panthers +10.5 should pair with original Packers -5.5");
+assert.equal(sample.best.middleLegs[0].stake,10.70,"$10 Packers +107 original profit is $10.70, which sets middle sizing");
+assert.equal(sample.best.middleLegs[0].spread,10.5);
+assert.equal(sample.best.hedgeRecommendation.originalTeam,"A","the separate hedge must target original Panthers +3.5");
+assert.equal(sample.best.hedgeRecommendation.recommendation.leg.spread,-3.5);
+assert.equal(sample.best.hedgeRecommendation.recommendation.leg.odds,-400);
+assert.equal(sample.best.hedgeRecommendation.recommendation.leg.stake,17.04,
+ "standalone target-ticket minimax hedge size should be $17.04; portfolio optimizer may differ");
+
 console.log("coordinated-middle-planner tests passed");
