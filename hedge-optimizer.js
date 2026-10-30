@@ -17,6 +17,17 @@ function optimizeSingleLegHedges({ originalLegs, candidates, maxAddedStake, maxT
   const originalStake = originalLegs.reduce((s, l) => s + l.stake, 0);
   const budget = Math.max(0, Math.min(maxAddedStake, maxTotalStake - originalStake));
   const maxCents = Math.floor((budget + 1e-8) * 100);
+  // No positive penny stake fits the available budget. Return cleanly before
+  // evaluating candidate legs; a zero-stake leg is invalid settlement input.
+  if (maxCents < 1) {
+    return {
+      best: null,
+      alternatives: [],
+      evaluated: 0,
+      availableAddedBudget: budget,
+      sizingMethod: "piecewise-linear intersection search at cent precision"
+    };
+  }
   const options = [];
   for (const candidate of candidates) {
     if (!candidate || !["A", "B"].includes(candidate.team) ||
