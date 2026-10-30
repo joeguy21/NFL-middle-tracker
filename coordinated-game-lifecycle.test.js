@@ -47,5 +47,5 @@ assert.equal(ignored.status,"tracking","Ignoring keeps the wager set active.");
 assert.equal(ignored.stoppedAt,null);
 assert.equal(ignoreCoordinatedAlert(ignored).status,"tracking","Repeated alerts remain eligible.");
 assert.throws(()=>ignoreCoordinatedAlert(accepted),/actively tracked/);
-assert.throws(()=>acceptCoordinatedPlan(saved,{}),/plan ID required/);
+assert.throws(()=>acceptCoordinatedPlan(saved,{}),/plan ID is required/);
 console.log("coordinated game lifecycle tests passed");
